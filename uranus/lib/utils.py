@@ -17,13 +17,28 @@
 """
 # ---imports---
 import logging
+import pkg_resources
+from . import const
 
 
 # ---Module regime consts and variables---
 print_prefix='lib.utils>>'
 
+def fetch_pkgdata(fn_path):
+    try:
+        data_file = pkg_resources.resource_filename(
+            const.PKG_NAME, fn_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"Config file '{fn_path}' not found in '{const.PKG_NAME}'.")
+    return data_file
 
+def valid_path(path):
+    if len(path)<5:
+        throw_error(f'invalid path: {path}')    
+    return path
 # ---Classes and Functions---
+
 def throw_error(msg):
     '''
     throw error and exit

@@ -15,7 +15,8 @@ setuptools.setup(
     url="",
     packages=setuptools.find_packages(),
     package_data={
-        'uranus': ['conf/config.case.ini', 'conf/config.logging.ini'],
+        'uranus': ['conf/config.case.ini', 'conf/config.logging.ini',
+                   'db/*'],
     }, 
     classifiers=[
         "Programming Language :: Python :: 3",
