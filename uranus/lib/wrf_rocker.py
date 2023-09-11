@@ -1,29 +1,37 @@
 #/usr/bin/env python3
 """Build WRF preprocess workflow"""
-import os, shutil, cftime
+import os, shutil, cftime, subprocess
 import pandas as pd
 import xarray as xr
 import numpy as np
+from scipy.io import FortranFile
 from . import utils, io, const, mathlib
 
 # ---Module regime consts and variables---
-print_prefix='lib.WRFMaker>>'
+print_prefix='lib.WRFController>>'
 
-class WRFMaker:
+
+# ---Classes and Functions---
+class WRFRocker:
     def __init__(self, uranus):
         self.uranus=uranus
         self.cfg=uranus.cfg
         wrfcfg=self.cfg['WRF']
         self.run_maker=wrfcfg.getboolean('preprocess_wrf')
+        self.rewrite_geog=wrfcfg.getboolean('rewrite_geo_em')
+        self.rewrite_namelist=wrfcfg.getboolean('rewrite_namelist')
         self.drv_type=wrfcfg['drv_type']
         self.drv_dic=const.DRV_DIC[self.drv_type]
         self.run_ungrib=wrfcfg.getboolean('run_ungrib')
         self.run_metgrid=wrfcfg.getboolean('run_metgrid')
         self.run_real=wrfcfg.getboolean('run_real')
+        self.run_wrf=wrfcfg.getboolean('run_wrf')
         self.drv_root=utils.valid_path(wrfcfg['drv_root'])
         self.wps_root, self.wrf_root=utils.valid_path(wrfcfg['wps_root']), utils.valid_path(wrfcfg['wrf_root'])
+        self.ntasks_wrf=wrfcfg.getint('ntasks_wrf')
+        mach_name=self.uranus.machine_name
+        self.mach_meta=const.MACHINE_DIC[mach_name]
         utils.write_log(f'{print_prefix}WRFMaker Initiation Done.')
-    
     def make_icbc(self):
         if self.run_maker:
             self.preprocess()
@@ -33,17 +41,57 @@ class WRFMaker:
                 self.metgrid()
             if self.run_real:
                 self.real()
+            if self.run_wrf:
+                self.wrf()
         else:
             utils.write_log('run_maker is False, No need to make wps')
             return
-        
-    # ---Classes and Functions---
     def preprocess(self):
         self.clean_workspace()
-    
+        if self.rewrite_geog:
+            domfn=os.path.join(
+                self.uranus.domdb_root, self.uranus.nml_temp, 'geo_em*')
+            io.copy_files(domfn, self.wps_root)
+        
+        if self.rewrite_namelist:
+            # WPS: deal with namelist.wps
+            nml_src=os.path.join(
+                self.uranus.cfgdb_root, self.uranus.nml_temp, 'namelist.wps')
+            nml_dest=os.path.join(self.wps_root, 'namelist.wps')
+            
+            shutil.copy(nml_src, nml_dest)
+            utils.sed_wrf_timeline('start_date',self.uranus.sim_strt_time,nml_dest)
+            utils.sed_wrf_timeline('end_date',self.uranus.sim_end_time,nml_dest)
+            interval=int(self.drv_dic['atm_nfrq'][0])*3600
+            utils.sedline('interval_seconds',f'interval_seconds = {interval}',nml_dest) 
+            prefix=self.drv_type.upper()
+            utils.sedline('prefix',f"prefix = '{prefix}'",nml_dest) 
+            utils.sedline('fg_name',f"fg_name = '{prefix}'",nml_dest) 
+            
+            # WRF: deal with namelist.input
+            nml_src=os.path.join(
+                self.uranus.cfgdb_root, self.uranus.nml_temp, 'namelist.input')
+            nml_dest=os.path.join(self.wrf_root, 'namelist.input')
+            shutil.copy(nml_src, nml_dest)
+            start_time,end_time=self.uranus.sim_strt_time,self.uranus.sim_end_time
+            sim_hrs=self.uranus.run_days*24
+            utils.sedline('run_hours',f"run_hours = {sim_hrs}",nml_dest)
+            utils.sed_wrf_timeline('start_year',start_time,nml_dest,fmt='%Y')
+            utils.sed_wrf_timeline('start_month',start_time,nml_dest,fmt='%m')
+            utils.sed_wrf_timeline('start_day',start_time,nml_dest,fmt='%d')
+            utils.sed_wrf_timeline('start_hour',start_time,nml_dest,fmt='%H')
+             
+            utils.sed_wrf_timeline('end_year',end_time,nml_dest,fmt='%Y')
+            utils.sed_wrf_timeline('end_month',end_time,nml_dest,fmt='%m')
+            utils.sed_wrf_timeline('end_day',end_time,nml_dest,fmt='%d')
+            utils.sed_wrf_timeline('end_hour',end_time,nml_dest,fmt='%H')
+            utils.sedline('interval_seconds',f'interval_seconds = {interval}',nml_dest) 
     def clean_workspace(self):
-        if self.run_ungrib or self.run_metgrid:
-            io.del_files(self.wps_root, const.WPS_CLEAN_LIST)
+        if self.run_ungrib:
+            io.del_files(self.wps_root, const.UNGRIB_CLEAN_LIST)
+        
+        if self.run_metgrid:
+            io.del_files(self.wps_root, const.METGRID_CLEAN_LIST)
         
         if self.run_real:
             io.del_files(self.wrf_root, const.WRF_CLEAN_LIST)
@@ -60,11 +108,32 @@ class WRFMaker:
         for time_frm in self.frm_time_series:
             pass 
     def metgrid(self):
-        pass
-    
+        mach_meta=self.mach_meta
+        bashrc=mach_meta['bashrc']
+        mpicmd=mach_meta['mpicmd']
+        metgrid_np=mach_meta['metgrid_np']
+        cmd=f'source {bashrc}; cd {self.wps_root};{mpicmd} -np {metgrid_np} ./metgrid.exe'
+        utils.write_log(print_prefix+'Run metgrid.exe: '+cmd)
+        subprocess.run(cmd, shell=True)
+         
     def real(self):
-        pass
+        mach_meta=self.mach_meta
+        bashrc=mach_meta['bashrc']
+        mpicmd=mach_meta['mpicmd']
+        real_np=mach_meta['real_np']
+        io.symlink_files(os.path.join(self.wps_root,'met_em.d*'), self.wrf_root)
+        cmd=f'source {bashrc}; cd {self.wrf_root};{mpicmd} -np {real_np} ./real.exe'
+        utils.write_log(print_prefix+'Run real.exe: '+cmd)
+        subprocess.run(cmd, shell=True)
     
+    def wrf(self):
+        mach_meta=self.mach_meta
+        bashrc=mach_meta['bashrc']
+        mpicmd=mach_meta['mpicmd']
+        wrf_np=self.ntasks_wrf
+        cmd=f'source {bashrc}; cd {self.wrf_root};{mpicmd} -np {wrf_np} ./wrf.exe'
+        utils.write_log(print_prefix+'Run wrf.exe: '+cmd)
+        subprocess.run(cmd, shell=True)
     
     
     def _build_meta(self):
@@ -86,7 +155,7 @@ class WRFMaker:
             start=init_time, end=end_time, freq=drv_dic['atm_nfrq'])
        
         self.file_time_series=pd.date_range(
-            start=init_time, end=end_time, freq=drv_dic['atm_file_nfrq'])
+            start=init_time, end=end_time, freq=drv_dic['atm_file_nfrq'], inclusive='left')
         
         self.atmfn_lst=io.gen_patternfn_lst(
             self.drv_root, drv_dic, init_time, end_time)
@@ -94,11 +163,19 @@ class WRFMaker:
             self.lnd_root=self.cfg['cpsv3']['lnd_root']
             self.lndfn_lst=io.gen_patternfn_lst(
                 self.lnd_root, drv_dic, init_time, end_time, kw='lnd')
+    
+    
+   
+    # Below for BYTEFLOW toolkits to generate interim files
     def _gen_interim(self):
+        
+        self.out_slab=io.gen_wrf_mid_template(self.drv_type)
+
         for it, tf in enumerate(self.frm_time_series):
             if tf in self.file_time_series:
                 self._load_raw(tf)
             self._parse_raw(it)
+            self._org_wrfinterm(tf)
             
     def _parse_raw(self,it):
         tf = self.frm_time_series[it]
@@ -113,6 +190,8 @@ class WRFMaker:
             ps=io.sel_frm(ds[drv_dic['psname']], tf, itf)
         for idy, itm in df_meta.iterrows():
             src_v, aim_v=itm['src_v'], itm['aim_v']
+            if src_v.startswith('#'):
+                continue
             lvltype=itm['type']
             lvlmark=itm['lvlmark']
             utils.write_log(
@@ -123,7 +202,9 @@ class WRFMaker:
                     da=accum_soil_moist(
                         da, aim_v, self.drv_dic['soillv'], self.drv_dic['soil_dim_name'])
                 elif aim_v.startswith('ST'):
-                    da=avg_soil_temp(da, aim_v, self.drv_dic['soillv'], self.drv_dic['soil_dim_name'])
+                    da=avg_soil_temp(
+                        da, aim_v, self.drv_dic['soillv'], self.drv_dic['soil_dim_name'])
+                    da=xr.where(da>0, da, np.nan)
                 else: # land sea mask
                     da=da[0,:,:]
                     da=xr.where(da>0, 1, 0)
@@ -134,12 +215,11 @@ class WRFMaker:
                 if lvlmark == 'Lev' and drv_dic['vcoord']=='sigmap':
                     # interpolate from hybrid to pressure level 
                     da=mathlib.hybrid2pressure(da,self.ap,self.b, ps, PLVS)
-                self.outfrm[src_v]=da.interp(lat=LATS, lon=LONS, plev=PLVS,
+                self.outfrm[aim_v+'3D']=da.interp(lat=LATS, lon=LONS, plev=PLVS,
                         method='linear',kwargs={"fill_value": "extrapolate"})
-            
             elif lvltype in ['2d', '2d-soil']:
-                #da=da.interpolate_na(
-                #    dim="lon", method="nearest",fill_value="extrapolate")    
+                da=da.interpolate_na(
+                    dim="lon", method="nearest",fill_value="extrapolate")    
                 self.outfrm[aim_v]=da.interp(lat=LATS, lon=LONS,
                     method='linear',kwargs={"fill_value": "extrapolate"})
         # for test
@@ -163,7 +243,46 @@ class WRFMaker:
         
         if self.drv_type=='cpsv3':
             self.ds_lnd=xr.open_dataset(self.lndfn_lst[idx])
+    
+    
+    def _org_wrfinterm(self, tf, tgt='main'):
+        ymdH=tf.strftime('%Y-%m-%d_%H')
+        df_meta=self.df_meta
+        PNAME=self.drv_dic['plv']
+        PLVS=const.PLV_DIC[PNAME]
+        
+        if tgt=='main':
+            out_fn=os.path.join(self.wps_root,f'{self.drv_type.upper()}:{ymdH}')
+        if tgt=='sst':
+            out_fn=os.path.join(self.wps_root,f'{self.drv_type.upper()}_SST:{ymdH}')
+        
+        utils.write_log(print_prefix+'Writing '+out_fn)
+        
+        # dtype='>u4' for header (big-endian, unsigned int)
+        wrf_mid = FortranFile(out_fn, 'w', header_dtype=np.dtype('>u4'))
+        
+        out_dic=self.out_slab
+        out_dic['HDATE']=tf.strftime('%Y-%m-%d_%H:%M:%S:0000')
+        
             
+        for idy, itm in df_meta.iterrows():
+            src_v, aim_v=itm['src_v'], itm['aim_v']
+            if src_v.startswith('#'):
+                continue
+            lvltype=itm['type']
+            out_dic['FIELD']=aim_v
+            out_dic['UNIT']=itm['units']
+            out_dic['DESC']=itm['desc']
+            out_dic['XLVL']=200100.0
+            if lvltype=='3d':
+                for lvl in PLVS:
+                    out_dic['XLVL']=lvl
+                    out_dic['SLAB']=self.outfrm[aim_v+'3D'].sel(plev=lvl).values
+                    io.write_record(wrf_mid, out_dic)
+            elif lvltype=='2d' or lvltype=='2d-soil':
+                out_dic['SLAB']=self.outfrm[aim_v].values
+            io.write_record(wrf_mid, out_dic)
+        wrf_mid.close()        
             
 def accum_soil_moist(da, aim_v, model_name, lvname):
     strt_dp, end_dp=utils.decode_depth(aim_v)

@@ -19,7 +19,56 @@
 import logging
 import pkg_resources
 from . import const
+import re
+import shutil
+from tempfile import mkstemp
 
+def sed_wrf_timeline(pattern, ts, source, fmt="'%Y-%m-%d_%H:%M:%S'", dedest=None):
+    ts_list=[ts.strftime(fmt)]*4
+    temp_str=','.join(ts_list)
+    sedline(pattern,f'{pattern} = {temp_str}',source)
+def sedline(pattern, replace, source, dest=None, count=0):
+    """Reads a source file and writes the destination file.
+
+    In each line, replaces pattern with replace.
+
+    Args:
+        pattern (str): pattern to match (can be re.pattern)
+        replace (str): replacement str
+        source  (str): input filename
+        count (int): number of occurrences to replace
+        dest (str):   destination filename, if not given, source will be over written.        
+    """
+
+    fin = open(source, 'r')
+    num_replaced = count
+
+    if dest:
+        fout = open(dest, 'w')
+    else:
+        fd, name = mkstemp()
+        fout = open(name, 'w')
+
+    for line in fin:
+        out = line
+        if pattern in line:
+            out = ' '+replace+'\n'
+        fout.write(out)
+
+        if out != line:
+            num_replaced += 1
+        if count and num_replaced > count:
+            break
+    try:
+        fout.writelines(fin.readlines())
+    except Exception as E:
+        raise E
+
+    fin.close()
+    fout.close()
+
+    if not dest:
+        shutil.move(name, source)
 
 # ---Module regime consts and variables---
 print_prefix='lib.utils>>'

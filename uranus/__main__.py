@@ -43,6 +43,7 @@ class Uranus:
         
         self.mode=cfg['uranus_mode']
         self.nml_temp=cfg['nml_temp']
+        self.machine_name=cfg['machine_name']
         self.cfgdb_root=cfg['cfgdb_root']
         self.domdb_root=cfg['domdb_root']
         
@@ -57,8 +58,8 @@ class Uranus:
         self.makewrf()
         
     def makewrf(self):
-        from .lib import wrf_icbc_maker
-        self.wrfmaker=wrf_icbc_maker.WRFMaker(self)
+        from .lib import wrf_rocker
+        self.wrfmaker=wrf_rocker.WRFRocker(self)
         self.wrfmaker.make_icbc() 
     
     def _setup_logging(self):

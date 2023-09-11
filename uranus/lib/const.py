@@ -4,8 +4,16 @@ import numpy as np
 PKG_NAME = 'uranus'
 
 # WRF
-WPS_CLEAN_LIST=['met_em', 'CFS', 'ERA', 'SST', 'PFILE', 'GFS']
+UNGRIB_CLEAN_LIST=['CFS', 'ERA', 'SST', 'PFILE', 'GFS', 'CPSV3']
+METGRID_CLEAN_LIST=['met_em']
 WRF_CLEAN_LIST=['met_em','wrfinput_','wrflowinp_','wrffda_','wrfrst_']
+MACHINE_DIC={
+    'hqlx74':{
+        'bashrc':'/home/lzhenn/.bashrc_intel20_amd',
+        'mpicmd':'mpirun', 'corespernode':128, 'nodes':1,
+        'metgrid_np':16, 'real_np':16, 'wrf_np':32
+    }
+}
 
 DRV_DIC={
     'cpsv3':{
