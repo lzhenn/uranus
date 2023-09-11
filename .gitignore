@@ -1,5 +1,6 @@
 *.pyc
 *.log
+*.nc
 build
 *.egg-info
 dist

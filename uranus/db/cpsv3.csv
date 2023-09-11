@@ -3,17 +3,16 @@ PS,PSFC,Pa,2d,Lev, Surface pressure
 PSL,PMSL,Pa,2d,PlevPt, Mean sea-level pressure
 Q,SPECHUMD,kg kg-1,3d,Lev,3-d specific humidity
 QREFHT,SPECHUMD, kg kg-1,2d,PlevPt, 2-m relative humidity
-T,TT,K,3d,PlevPt,3-d air temperature
+T,TT,K,3d,Lev,3-d air temperature
 TREFHT,TT,K,2d,PlevPt, 2-m temperature
 TS,SKINTEMP, K,2d,PlevPt, Skin temperature
-U,UU,m s-1,3d,PlevPt, 3-d wind u-component
-V,VV,m s-1,3d,PlevPt, 3-d wind v-component
+U,UU,m s-1,3d,Lev, 3-d wind u-component
+V,VV,m s-1,3d,Lev, 3-d wind v-component
 UAS,UU,m s-1,2d,PlevPt, 10m wind u-component
 VAS,VV,m s-1,2d,PlevPt, 10m wind v-component
-Z3,GHT,m,3d,PlevPt, 3-d geopotential height
-SOILLIQ,SM000009, m3/m-3,2d-soil,PlevPt, 0-9 cm soil moisture
-SOILLIQ,SM009050, m3/m-3,2d-soilr,PlevPt, 9-50 cm soil moisture
-SOILLIQ,SM050200, m3/m-3,2d-soilr,PlevPt, 50-200 cm soil moisture
-TSOI,ST000009, m3/m-3,2d-soil,PlevPt, 0-9 cm soil moisture
-TSOI,ST009050, m3/m-3,2d-soilr,PlevPt, 9-50 cm soil moisture
-TSOI,ST050200, m3/m-3,2d-soilr,PlevPt, 50-200 cm soil moisture
+Z3,GHT,m,3d,Lev,3-d geopotential height
+TSOI,LANDSEA, fraction,2d-soil,PlevPt, Land-sea mask (0=water|1=land)
+SOILLIQ,SM000010, m3 m-3,2d-soil,PlevPt, 0-10 cm soil moisture
+SOILLIQ,SM010200, m3 m-3,2d-soil,PlevPt, 10-200 cm soil moisture
+TSOI,ST000010, K,2d-soil,PlevPt, 0-10 cm soil temperature 
+TSOI,ST010200, K,2d-soil,PlevPt, 10-200 cm soil temperature

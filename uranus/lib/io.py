@@ -16,6 +16,14 @@ def del_files(tgt_path, fnpatterns):
     for filename in file_list:
         if filename.startswith(tuple(fnpatterns)):
             os.remove(os.path.join(tgt_path, filename))
+            
+def sel_frm(da_src, tf, itf):
+    try:
+        da=da_src.sel(time=tf, method='nearest')
+    except TypeError:
+        da=da_src.isel(time=itf)
+    return da
+
 def gen_patternfn_lst(drv_root, drv_dic, inittime, endtime, kw='atm'):
     fn_lst=[]
     tfs=pd.date_range(start=inittime, end=endtime, freq=drv_dic['atm_file_nfrq'])

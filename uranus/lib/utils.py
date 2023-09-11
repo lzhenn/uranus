@@ -24,6 +24,10 @@ from . import const
 # ---Module regime consts and variables---
 print_prefix='lib.utils>>'
 
+def decode_depth(soil_str):
+    strt = int(soil_str[2:5])*0.01
+    end = int(soil_str[5:])*0.01
+    return strt, end
 def fetch_pkgdata(fn_path):
     try:
         data_file = pkg_resources.resource_filename(
