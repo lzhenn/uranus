@@ -21,6 +21,8 @@ def symlink_files(src_path, dest_path):
         f'{print_prefix}Symlink files from {src_path} to {dest_path}...')
     for file in glob.glob(rf'{src_path}'):
         link_name = os.path.join(dest_path, os.path.basename(file))
+        if os.path.exists(link_name):
+            os.remove(link_name)
         os.symlink(file, link_name)        
 # ---Classes and Functions---
 def del_files(tgt_path, fnpatterns):
@@ -39,7 +41,9 @@ def sel_frm(da_src, tf, itf):
 
 def gen_patternfn_lst(drv_root, drv_dic, inittime, endtime, kw='atm'):
     fn_lst=[]
-    tfs=pd.date_range(start=inittime, end=endtime, freq=drv_dic['atm_file_nfrq'])
+    # do not include the last time frame
+    tfs=pd.date_range(start=inittime, end=endtime, 
+                      inclusive='left', freq=drv_dic[f'{kw}_file_nfrq'])
     pattern=drv_dic[f'{kw}_naming_pattern']
     if '$I' in pattern:
         init_fmt=pattern.split('$I')[1]
@@ -47,7 +51,7 @@ def gen_patternfn_lst(drv_root, drv_dic, inittime, endtime, kw='atm'):
         pattern=pattern.replace(f'$I{init_fmt}$I', init_str)
     frm_fmt=pattern.split('$F')[1]
     
-    for tf in tfs[:-1]: # do not include the last time frame
+    for tf in tfs: 
         frm_str = tf.strftime(frm_fmt)
         # Replace the placeholders with the formatted strings
         fn=pattern.replace(f'$F{frm_fmt}$F', frm_str)
@@ -56,8 +60,7 @@ def gen_patternfn_lst(drv_root, drv_dic, inittime, endtime, kw='atm'):
             utils.throw_error(f'file not exist: {fn_full}')
         fn_lst.append(fn_full)
 
-    return fn_lst
-
+    return fn_lst, tfs
 # WRF Interim File
 def gen_wrf_mid_template(drv_key):
     # init the dictionary

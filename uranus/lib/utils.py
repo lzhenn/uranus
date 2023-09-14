@@ -23,11 +23,25 @@ import re
 import shutil
 from tempfile import mkstemp
 
+
+def parse_fmt_timepath(tgt_time, fmtpath):
+    '''
+    parse time string to datetime object
+    '''
+    seg_path=fmtpath.split('@')
+    parsed_path=''
+    for seg in seg_path:
+        if seg.startswith('%'):
+            parsed_path+=tgt_time.strftime(seg)
+        else:
+            parsed_path+=seg
+    return parsed_path
+
 def sed_wrf_timeline(pattern, ts, source, fmt="'%Y-%m-%d_%H:%M:%S'", dedest=None):
     ts_list=[ts.strftime(fmt)]*4
     temp_str=','.join(ts_list)
     sedline(pattern,f'{pattern} = {temp_str}',source)
-def sedline(pattern, replace, source, dest=None, count=0):
+def sedline(pattern, replace, source, dest=None, count=1):
     """Reads a source file and writes the destination file.
 
     In each line, replaces pattern with replace.

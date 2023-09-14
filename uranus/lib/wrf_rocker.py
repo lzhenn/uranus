@@ -17,11 +17,11 @@ class WRFRocker:
         self.uranus=uranus
         self.cfg=uranus.cfg
         wrfcfg=self.cfg['WRF']
-        self.run_maker=wrfcfg.getboolean('preprocess_wrf')
+        self.run_maker=wrfcfg.getboolean('rock_wrf')
         self.rewrite_geog=wrfcfg.getboolean('rewrite_geo_em')
         self.rewrite_namelist=wrfcfg.getboolean('rewrite_namelist')
         self.drv_type=wrfcfg['drv_type']
-        self.drv_dic=const.DRV_DIC[self.drv_type]
+        self.drv_dic=const.DRV_DIC[self.drv_type+'_wrf']
         self.run_ungrib=wrfcfg.getboolean('run_ungrib')
         self.run_metgrid=wrfcfg.getboolean('run_metgrid')
         self.run_real=wrfcfg.getboolean('run_real')
@@ -29,8 +29,7 @@ class WRFRocker:
         self.drv_root=utils.valid_path(wrfcfg['drv_root'])
         self.wps_root, self.wrf_root=utils.valid_path(wrfcfg['wps_root']), utils.valid_path(wrfcfg['wrf_root'])
         self.ntasks_wrf=wrfcfg.getint('ntasks_wrf')
-        mach_name=self.uranus.machine_name
-        self.mach_meta=const.MACHINE_DIC[mach_name]
+        self.mach_meta=self.uranus.machine_dic
         utils.write_log(f'{print_prefix}WRFMaker Initiation Done.')
     def make_icbc(self):
         if self.run_maker:
@@ -44,7 +43,7 @@ class WRFRocker:
             if self.run_wrf:
                 self.wrf()
         else:
-            utils.write_log('run_maker is False, No need to make wps')
+            utils.write_log(f'{print_prefix}run_maker is False, No need to make wps')
             return
     def preprocess(self):
         self.clean_workspace()
@@ -105,8 +104,6 @@ class WRFRocker:
             utils.write_log(f'{self.drv_type} use struct BYTEFLOW toolkit to generate wrf interim files')
             self._build_meta()
             self._gen_interim()
-        for time_frm in self.frm_time_series:
-            pass 
     def metgrid(self):
         mach_meta=self.mach_meta
         bashrc=mach_meta['bashrc']
@@ -154,10 +151,8 @@ class WRFRocker:
         self.frm_time_series=pd.date_range(
             start=init_time, end=end_time, freq=drv_dic['atm_nfrq'])
        
-        self.file_time_series=pd.date_range(
-            start=init_time, end=end_time, freq=drv_dic['atm_file_nfrq'], inclusive='left')
         
-        self.atmfn_lst=io.gen_patternfn_lst(
+        self.atmfn_lst, self.file_time_series=io.gen_patternfn_lst(
             self.drv_root, drv_dic, init_time, end_time)
         if self.drv_type=='cpsv3':
             self.lnd_root=self.cfg['cpsv3']['lnd_root']
@@ -190,6 +185,7 @@ class WRFRocker:
             ps=io.sel_frm(ds[drv_dic['psname']], tf, itf)
         for idy, itm in df_meta.iterrows():
             src_v, aim_v=itm['src_v'], itm['aim_v']
+            # skip comments or ocean files
             if src_v.startswith('#'):
                 continue
             lvltype=itm['type']
