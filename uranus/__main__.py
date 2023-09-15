@@ -119,7 +119,7 @@ class Uranus:
             # run coawstM
             cmd=f'source {self.bashrc}; cd {self.cplexe_root};'
             cmd+=f'{self.mpicmd} -np {self.ntasks_all} ./coawstM {cpl_in}'
-            cmd+=f' > {self.cplexe_root}/coawstM.log'
+            cmd+=f' >& {self.cplexe_root}/coawstM.log'
             utils.write_log(print_prefix+'Run coawstM: '+cmd)
             subprocess.run(cmd, shell=True)
  

@@ -22,7 +22,7 @@ DRV_DIC={
     'cpsv3_wrf':{
         'use_ungrib':False,'atm_nfrq':'6H','atm_file_nfrq':'1D', 'frm_per_file':4,
         'vcoord':'sigmap', 'acoef':'hyam', 'bcoef':'hybm', 'psname':'PS', 
-        'soillv':'CLM2', 'soil_dim_name':'levsoi',
+        'lnd_file_nfrq':'1D', 'soillv':'CLM2', 'soil_dim_name':'levsoi',
         'atm_naming_pattern':'$I%Y%m%d%H$I.cam2.h4.$F%Y-%m-%d$F-00000.nc',
         'lnd_naming_pattern':'$I%Y%m%d%H$I.clm2.h2.$F%Y-%m-%d$F-00000.nc',
         'lats':np.linspace(-89.6559642468699, 89.6559642468699, 400), 
@@ -38,7 +38,7 @@ DRV_DIC={
 
 # Lower bottom level 
 SOILLV_DIC={
-    'CLM2':0.01*np.array([0, 1.75, 4.51, 9.06, 16.55, 28.91, 49.29, 82.89, 138.28, 229.61, 380.19]),
+    'CLM2':0.01*np.array([1.75, 4.51, 9.06, 16.55, 28.91, 49.29, 82.89, 138.28, 229.61, 380.19]),
 }
 
 PLV_DIC={

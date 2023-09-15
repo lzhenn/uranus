@@ -12,11 +12,11 @@ UAS,UU,m s-1,2d,PlevPt, 10m wind u-component
 VAS,VV,m s-1,2d,PlevPt, 10m wind v-component
 Z3,GHT,m,3d,Lev,3-d geopotential height
 #TSOI,LANDSEA, fraction,2d-soil,PlevPt, Land-sea mask (0=water|1=land)
-SOILLIQ,SM000007, m3 m-3,2d-soil,PlevPt, 0-10 cm soil moisture
-SOILLIQ,SM007028, m3 m-3,2d-soil,PlevPt, 10-200 cm soil moisture
-SOILLIQ,SM028100, m3 m-3,2d-soil,PlevPt, 10-200 cm soil moisture
-SOILLIQ,SM100255, m3 m-3,2d-soil,PlevPt, 10-200 cm soil moisture
-TSOI,ST000007, K,2d-soil,PlevPt, 0-10 cm soil temperature 
-TSOI,ST007028, K,2d-soil,PlevPt, 0-10 cm soil temperature 
-TSOI,ST028100, K,2d-soil,PlevPt, 10-200 cm soil temperature
-TSOI,ST100255, K,2d-soil,PlevPt, 10-200 cm soil temperature
+SOILLIQ,SM000007, m3 m-3,2d-soil,PlevPt, 0-7 cm soil moisture
+SOILLIQ,SM007028, m3 m-3,2d-soil,PlevPt, 7-28 cm soil moisture
+SOILLIQ,SM028100, m3 m-3,2d-soil,PlevPt, 28-100 cm soil moisture
+SOILLIQ,SM100289, m3 m-3,2d-soil,PlevPt, 100-255 cm soil moisture
+TSOI,ST000007, K,2d-soil,PlevPt, 0-7 cm soil temperature 
+TSOI,ST007028, K,2d-soil,PlevPt, 7-28 cm soil temperature 
+TSOI,ST028100, K,2d-soil,PlevPt, 28-100 cm soil temperature
+TSOI,ST100289, K,2d-soil,PlevPt, 100-255 cm soil temperature

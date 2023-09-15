@@ -30,6 +30,11 @@ class WRFRocker:
         self.wps_root, self.wrf_root=utils.valid_path(wrfcfg['wps_root']), utils.valid_path(wrfcfg['wrf_root'])
         self.ntasks_wrf=wrfcfg.getint('ntasks_wrf')
         self.mach_meta=self.uranus.machine_dic
+        # read drv meta
+        resource_path = os.path.join('db', self.drv_type+'.csv')
+        self.df_meta=pd.read_csv(utils.fetch_pkgdata(resource_path))
+ 
+        
         utils.write_log(f'{print_prefix}WRFMaker Initiation Done.')
     def make_icbc(self):
         if self.run_maker:
@@ -74,7 +79,14 @@ class WRFRocker:
             shutil.copy(nml_src, nml_dest)
             start_time,end_time=self.uranus.sim_strt_time,self.uranus.sim_end_time
             sim_hrs=self.uranus.run_days*24
-            utils.sedline('run_hours',f"run_hours = {sim_hrs}",nml_dest)
+            nsoil = (self.df_meta['aim_v'].str.startswith('SM')).sum()
+            nplv=int(self.drv_dic['plv'][2:])+1
+            sed_dic={
+                'run_hours':sim_hrs, 'interval_seconds':interval,
+                'num_metgrid_soil_levels':nsoil, 'num_metgrid_levels':nplv,}
+            for key, itm in sed_dic.items():
+                utils.sedline(key, f'{key} = {itm}',nml_dest)
+            
             utils.sed_wrf_timeline('start_year',start_time,nml_dest,fmt='%Y')
             utils.sed_wrf_timeline('start_month',start_time,nml_dest,fmt='%m')
             utils.sed_wrf_timeline('start_day',start_time,nml_dest,fmt='%d')
@@ -84,7 +96,6 @@ class WRFRocker:
             utils.sed_wrf_timeline('end_month',end_time,nml_dest,fmt='%m')
             utils.sed_wrf_timeline('end_day',end_time,nml_dest,fmt='%d')
             utils.sed_wrf_timeline('end_hour',end_time,nml_dest,fmt='%H')
-            utils.sedline('interval_seconds',f'interval_seconds = {interval}',nml_dest) 
     def clean_workspace(self):
         if self.run_ungrib:
             io.del_files(self.wps_root, const.UNGRIB_CLEAN_LIST)
@@ -141,10 +152,7 @@ class WRFRocker:
         drv_dic=self.drv_dic 
         # specific configs for drv types
         
-        # read drv meta
-        resource_path = os.path.join('db', self.drv_type+'.csv')
-        self.df_meta=pd.read_csv(utils.fetch_pkgdata(resource_path))
-        
+       
         # build timefrms and file names
         init_time=uranus.sim_strt_time
         end_time=uranus.sim_end_time
@@ -156,7 +164,7 @@ class WRFRocker:
             self.drv_root, drv_dic, init_time, end_time)
         if self.drv_type=='cpsv3':
             self.lnd_root=self.cfg['cpsv3']['lnd_root']
-            self.lndfn_lst=io.gen_patternfn_lst(
+            self.lndfn_lst, _=io.gen_patternfn_lst(
                 self.lnd_root, drv_dic, init_time, end_time, kw='lnd')
     
     
@@ -164,7 +172,7 @@ class WRFRocker:
     # Below for BYTEFLOW toolkits to generate interim files
     def _gen_interim(self):
         
-        self.out_slab=io.gen_wrf_mid_template(self.drv_type)
+        self.out_slab=io.gen_wrf_mid_template(self.drv_type+'_wrf')
 
         for it, tf in enumerate(self.frm_time_series):
             if tf in self.file_time_series:
@@ -178,7 +186,7 @@ class WRFRocker:
         ds,drv_dic=self.ds,self.drv_dic
         LATS,LONS,PNAME=self.drv_dic['lats'],self.drv_dic['lons'],self.drv_dic['plv']
         PLVS=const.PLV_DIC[PNAME]
-        
+        self.plvs=PLVS 
         # frm in file
         itf=it % drv_dic['frm_per_file']
         if drv_dic['vcoord']=='sigmap':
@@ -207,7 +215,7 @@ class WRFRocker:
             else:
                 da=io.sel_frm(self.ds[src_v], tf, itf)
             if lvltype=='3d':
-                #continue
+                #continue # for test
                 if lvlmark == 'Lev' and drv_dic['vcoord']=='sigmap':
                     # interpolate from hybrid to pressure level 
                     da=mathlib.hybrid2pressure(da,self.ap,self.b, ps, PLVS)
@@ -283,8 +291,9 @@ class WRFRocker:
 def accum_soil_moist(da, aim_v, model_name, lvname):
     strt_dp, end_dp=utils.decode_depth(aim_v)
     SOI_LVS=const.SOILLV_DIC[model_name]
-    DP_SOI_LVS=np.diff(SOI_LVS)
+    DP_SOI_LVS=np.diff(SOI_LVS,prepend=0.0)
     ids, ide, s_res, e_res=mathlib.find_indices(strt_dp, end_dp, SOI_LVS)
+    #print(ids,ide,s_res,e_res)
     # from kg m-2 to m3 m-2
     # accum
     da_r=da[ids:ide,:,:].sum(dim=lvname)    

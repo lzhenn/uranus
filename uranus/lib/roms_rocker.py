@@ -53,20 +53,30 @@ class ROMSRocker:
         ntimes=run_seconds//self.dt
         nrst=self.nrst*const.DAY_IN_SEC//self.dt
         nhis=self.nhis*const.HR_IN_SEC//self.dt 
-        ndefhis=const.DAY_IN_SEC//self.dt
+        # only use half day
+        ndefhis=const.DAY_IN_SEC//self.dt//2
         
         grdname=os.path.join('Projects', nml_temp, 'roms_d01_omp.nc')
         ininame=os.path.join('Projects', nml_temp, 'coawst_ini.nc')
         
-        tf_str=self.file_time_series[0].strftime('%Y%m%d')
-        clmname=os.path.join('Projects', nml_temp, f'coawst_clm_{tf_str}.nc')
-        bryname=os.path.join('Projects', nml_temp, f'coawst_bdy_{tf_str}.nc')
+        nclmfiles=len(self.file_time_series)
+        clmname,bryname='',''
+        for tf in self.file_time_series[:-1]: 
+            tf_str=tf.strftime('%Y%m%d')
+            clmname+=os.path.join('Projects', nml_temp, f'coawst_clm_{tf_str}.nc |\n')
+            bryname+=os.path.join('Projects', nml_temp, f'coawst_bdy_{tf_str}.nc |\n')
+       
+        tf_str=self.file_time_series[-1].strftime('%Y%m%d')
+        clmname+=os.path.join('Projects', nml_temp, f'coawst_clm_{tf_str}.nc')
+        bryname+=os.path.join('Projects', nml_temp, f'coawst_bdy_{tf_str}.nc')
+    
         
         sed_dic={
             'NtileI':self.uranus.ntasks_iocn, 'NtileJ':self.uranus.ntasks_jocn,
             'NTIMES':ntimes, 'DT':f"{self.dt:.1f}d0", 'NRST':nrst, 'NHIS':nhis, 
             'NDEFHIS':ndefhis, 'NDIA':nhis, 'NAVG':nhis, 
-            'GRDNAME':grdname, 'ININAME':ininame, 'CLMNAME':clmname, 'BRYNAME':bryname
+            'GRDNAME':grdname, 'ININAME':ininame, 'CLMNAME':clmname, 'BRYNAME':bryname,
+            'NCLMFILES':nclmfiles,'NBCFILES':nclmfiles,
         }
         for key, itm in sed_dic.items():
             utils.sedline(key, f'{key} == {itm}', roms_in)
@@ -143,13 +153,13 @@ class ROMSRocker:
             if tf==self.strt_time:
                 # pkg time
                 time_offset=self.strt_time - const.BASE_TIME
-                self.ds_smp['ocean_time'].values[:]=int(time_offset.total_seconds())*const.S2NS
+                self.ds_smp['ocean_time'].values[:]=int(time_offset.total_seconds())*const.S2NS#+const.HALF_DAY
                 self.ds_smp=self.ds_smp.assign_coords({'ocean_time':self.ds_smp['ocean_time']})
 
                 # output
                 inifn=os.path.join(self.proj_root, 'coawst_ini.nc')
                 self.ds_smp.to_netcdf(inifn)
-                utils.write_log(print_prefix+'build initial conditions done!')    
+                utils.write_log(print_prefix+'build initial conditions done!')
             self.build_clm(tf)
             self.build_bdy(tf)
    
