@@ -18,6 +18,12 @@ from . import const
 import shutil
 from tempfile import mkstemp
 
+def build_wrfcmd(mach_name, bashrc, exeroot, mpicmd, ntasks, exename):
+    if 'hqlx' in mach_name:
+        return f'ssh {mach_name} "source {bashrc}; cd {exeroot};{mpicmd} -np {ntasks} ./{exename}"'
+    else:
+        return f'source {bashrc}; cd {exeroot};{mpicmd} -np {ntasks} ./{exename}'
+    
 
 def parse_fmt_timepath(tgt_time, fmtpath):
     '''
