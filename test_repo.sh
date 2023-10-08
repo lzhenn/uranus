@@ -3,5 +3,5 @@
 python setup.py sdist
 pip install .
 cd test_case
-python test.py
+python cmip6_wrf.py
 cd ..

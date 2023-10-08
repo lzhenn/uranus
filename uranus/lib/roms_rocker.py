@@ -328,7 +328,7 @@ class ROMSRocker:
         for var in const.CLM_TIME_VAR:
             var_time=ds_clm[var+'_time']
             # pkg time
-            var_time.values[:]=int(time_offset.total_seconds())*const.S2NS+const.HALF_DAY
+            var_time.values[:]=int(time_offset.total_seconds())*const.S2NS+const.HALF_DAY_NS*2
             #ds_clm=ds_clm.assign_coords({var:var_time})
         
         clmfn=os.path.join(
@@ -367,7 +367,7 @@ class ROMSRocker:
         for var in const.BDY_TIME_VAR:
             var_time=ds_bdy[var+'_time']
             # pkg time
-            var_time.values[:]=int(time_offset.total_seconds())*const.S2NS+const.HALF_DAY
+            var_time.values[:]=int(time_offset.total_seconds())*const.S2NS+const.HALF_DAY_NS*2
             #ds_bdy=ds_bdy.assign_coords({var:var_time})
 
         bdyfn=os.path.join(

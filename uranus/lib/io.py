@@ -15,6 +15,11 @@ def copy_files(src_path, dest_path):
         f'{print_prefix}Copy files from {src_path} to {dest_path}...')
     for file in glob.glob(rf'{src_path}'):
         shutil.copy(file, dest_path)
+def move_files(src_path, dest_path):
+    utils.write_log(
+        f'{print_prefix}Move files from {src_path} to {dest_path}...')
+    for file in glob.glob(rf'{src_path}'):
+        shutil.move(file, dest_path)
         
 def symlink_files(src_path, dest_path):
     utils.write_log(
@@ -39,7 +44,9 @@ def sel_frm(da_src, tf, itf):
         da=da_src.isel(time=itf)
     return da
 
-def gen_patternfn_lst(drv_root, drv_dic, inittime, endtime, kw='atm'):
+def gen_patternfn_lst(drv_root, drv_dic, inittime, 
+        endtime, kw='atm',special=''):
+    
     fn_lst=[]
     # do not include the last time frame
     tfs=pd.date_range(start=inittime, end=endtime, 
@@ -49,8 +56,10 @@ def gen_patternfn_lst(drv_root, drv_dic, inittime, endtime, kw='atm'):
         init_fmt=pattern.split('$I')[1]
         init_str = inittime.strftime(init_fmt)
         pattern=pattern.replace(f'$I{init_fmt}$I', init_str)
+    if '$S' in pattern:
+        pattern=pattern.replace(f'$S', special)
+        
     frm_fmt=pattern.split('$F')[1]
-    
     for tf in tfs: 
         frm_str = tf.strftime(frm_fmt)
         # Replace the placeholders with the formatted strings
@@ -59,7 +68,6 @@ def gen_patternfn_lst(drv_root, drv_dic, inittime, endtime, kw='atm'):
         if not(os.path.exists(fn_full)):
             utils.throw_error(f'file not exist: {fn_full}')
         fn_lst.append(fn_full)
-
     return fn_lst, tfs
 # WRF Interim File
 def gen_wrf_mid_template(drv_key):

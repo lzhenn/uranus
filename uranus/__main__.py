@@ -41,17 +41,24 @@ class Uranus:
         self.cfg=cfgparser.read_cfg(os.path.join(CWD,cfgfn))
         cfg=self.cfg['URANUS']
         
-        self.rock_flg=cfg['rock_cpl']
+        self.rock_flg=cfg.getboolean('rock_cpl')
+        self.rock_wrf=self.cfg['WRF'].getboolean('rock_wrf')
+        self.rock_roms=self.cfg['ROMS'].getboolean('rock_roms')
         self.mode=cfg['uranus_mode']
         self.nml_temp=cfg['nml_temp']
         self.machine_name=cfg['machine_name']
+        
+        
         self.machine_dic=const.MACHINE_DIC[self.machine_name]
         self.bashrc=self.machine_dic['bashrc']
         self.mpicmd=self.machine_dic['mpicmd']
  
         self.cfgdb_root=self.machine_dic['cfgdb_root']
         self.domdb_root=self.machine_dic['domdb_root']
-        self.cplexe_root=self.machine_dic[f'{self.mode}_root']
+        if self.mode=='shu':
+            self.cplexe_root=self.cfg['WRF']['wrf_root']
+        else:
+            self.cplexe_root=self.machine_dic[f'{self.mode}_root']
         self.proj_root=os.path.join(
             self.cplexe_root,'Projects',self.nml_temp)
         
@@ -60,6 +67,8 @@ class Uranus:
         self.run_days=int(cfg['model_run_days'])
         self.sim_end_time=self.sim_strt_time+datetime.timedelta(days=self.run_days)
         
+        self.arch_flag=cfg.getboolean('archive_flag')
+        self.arch_root=utils.parse_fmt_timepath(self.sim_strt_time, cfg['arch_root'])
         utils.write_log('Uranus Initiation Done.')
 
     def waterfall(self):
@@ -69,13 +78,15 @@ class Uranus:
     
     def makewrf(self):
         from .lib import wrf_rocker
-        self.wrfmaker=wrf_rocker.WRFRocker(self)
-        self.wrfmaker.make_icbc() 
+        if self.rock_wrf:
+            self.wrfmaker=wrf_rocker.WRFRocker(self)
+            self.wrfmaker.rock() 
     
     def makeroms(self):
         from.lib import roms_rocker
-        self.romsmaker=roms_rocker.ROMSRocker(self)
-        self.romsmaker.build_icbc() 
+        if self.rock_roms:
+            self.romsmaker=roms_rocker.ROMSRocker(self)
+            self.romsmaker.build_icbc() 
     
     def cplrock(self):
         # rock the coupled model!
@@ -122,7 +133,17 @@ class Uranus:
             cmd+=f' >& {self.cplexe_root}/coawstM.log'
             utils.write_log(print_prefix+'Run coawstM: '+cmd)
             subprocess.run(cmd, shell=True)
- 
+        
+        if self.arch_flag:
+            self.archive_data()
+    
+    def archive_data(self):
+        if not(os.path.exists(self.arch_root)):
+            utils.write_log(print_prefix+'mkdir '+self.arch_root)
+            os.mkdir(self.arch_root)
+            file_patterns=['wrf[o,r,x]*','*nc']
+            for itm in file_patterns:
+                io.move_files(os.path.join(self.cplexe_root,itm), self.arch_root)
     def _setup_logging(self):
         """
         Configures the logging module using the 

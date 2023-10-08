@@ -36,7 +36,7 @@ class WRFRocker:
  
         
         utils.write_log(f'{print_prefix}WRFMaker Initiation Done.')
-    def make_icbc(self):
+    def rock(self):
         if self.run_maker:
             self.preprocess()
             if self.run_ungrib:
@@ -153,20 +153,28 @@ class WRFRocker:
         # specific configs for drv types
         
        
-        # build timefrms and file names
+        # build timefrms
         init_time=uranus.sim_strt_time
         end_time=uranus.sim_end_time
         self.frm_time_series=pd.date_range(
             start=init_time, end=end_time, freq=drv_dic['atm_nfrq'])
-       
         
+        # build file names
+        special=''
+        if self.drv_type=='bcmm':
+            special=uranus.cfg['bcmm']['scenario_name']
+        
+       
+        # atm    
         self.atmfn_lst, self.file_time_series=io.gen_patternfn_lst(
-            self.drv_root, drv_dic, init_time, end_time)
-        if self.drv_type=='cpsv3':
-            self.lnd_root=self.cfg['cpsv3']['lnd_root']
+            self.drv_root, drv_dic, init_time, end_time, 
+            kw='atm',special=special)
+        # lnd 
+        if self.drv_type in ['cpsv3','bcmm']:
+            self.lnd_root=self.cfg[self.drv_type]['lnd_root']
             self.lndfn_lst, _=io.gen_patternfn_lst(
-                self.lnd_root, drv_dic, init_time, end_time, kw='lnd')
-    
+                self.lnd_root, drv_dic, init_time, end_time, 
+                kw='lnd',special=special)
     
    
     # Below for BYTEFLOW toolkits to generate interim files
@@ -200,32 +208,43 @@ class WRFRocker:
             lvlmark=itm['lvlmark']
             utils.write_log(
                 print_prefix+'Parsing '+src_v+',lvltype='+lvltype+',lvlmark='+lvlmark)
-            if lvltype == '2d-soil' and self.drv_type=='cpsv3':
+            if lvltype == '2d-soil':
                 da=io.sel_frm(self.ds_lnd[src_v], tf, itf)
                 if aim_v.startswith('SM'):
+                    if  itm['units']=='kg/m-3':
+                        da.values=da.values*1e-2 # m^3/m-3
                     da=accum_soil_moist(
                         da, aim_v, self.drv_dic['soillv'], self.drv_dic['soil_dim_name'])
                 elif aim_v.startswith('ST'):
                     da=avg_soil_temp(
                         da, aim_v, self.drv_dic['soillv'], self.drv_dic['soil_dim_name'])
                     da=xr.where(da>0, da, np.nan)
-                else: # land sea mask
-                    da=da[0,:,:]
-                    da=xr.where(da>0, 1, 0)
+                #else: # land sea mask
+                #    da=da[0,:,:]
+                #    da=xr.where(da>0, 1, 0)
             else:
                 da=io.sel_frm(self.ds[src_v], tf, itf)
             if lvltype=='3d':
                 #continue # for test
+                if 'lev' in da.coords:
+                    da = da.rename({'lev': 'plev'})
+ 
                 if lvlmark == 'Lev' and drv_dic['vcoord']=='sigmap':
                     # interpolate from hybrid to pressure level 
                     da=mathlib.hybrid2pressure(da,self.ap,self.b, ps, PLVS)
-                self.outfrm[aim_v+'3D']=da.interp(lat=LATS, lon=LONS, plev=PLVS,
+                try: 
+                    self.outfrm[aim_v+'3D']=da.interp(lat=LATS, lon=LONS, plev=PLVS,
                         method='linear',kwargs={"fill_value": "extrapolate"})
+                except ValueError:
+                    self.outfrm[aim_v+'3D']=da.interp(lat=LATS, lon=LONS, lev=PLVS,
+                        method='linear',kwargs={"fill_value": "extrapolate"})
+                    
             elif lvltype in ['2d', '2d-soil']:
                 da=da.interpolate_na(
                     dim="lon", method="nearest",fill_value="extrapolate")    
                 self.outfrm[aim_v]=da.interp(lat=LATS, lon=LONS,
                     method='linear',kwargs={"fill_value": "extrapolate"})
+                
         # for test
         #for itm in self.outfrm.keys():
         #    self.outfrm[itm].to_netcdf(itm+'.nc')
@@ -244,10 +263,9 @@ class WRFRocker:
             aname,bname=self.drv_dic['acoef'],self.drv_dic['bcoef']
             self.ap=self.ds[aname].values
             self.b=self.ds[bname].values
-        
-        if self.drv_type=='cpsv3':
+        if self.drv_type in ['cpsv3','bcmm']:
             self.ds_lnd=xr.open_dataset(self.lndfn_lst[idx])
-    
+        
     
     def _org_wrfinterm(self, tf, tgt='main'):
         ymdH=tf.strftime('%Y-%m-%d_%H')
@@ -279,7 +297,7 @@ class WRFRocker:
             out_dic['DESC']=itm['desc']
             out_dic['XLVL']=200100.0
             if lvltype=='3d':
-                for lvl in PLVS:
+               for lvl in PLVS:
                     out_dic['XLVL']=lvl
                     out_dic['SLAB']=self.outfrm[aim_v+'3D'].sel(plev=lvl).values
                     io.write_record(wrf_mid, out_dic)
@@ -293,12 +311,14 @@ def accum_soil_moist(da, aim_v, model_name, lvname):
     SOI_LVS=const.SOILLV_DIC[model_name]
     DP_SOI_LVS=np.diff(SOI_LVS,prepend=0.0)
     ids, ide, s_res, e_res=mathlib.find_indices(strt_dp, end_dp, SOI_LVS)
-    #print(ids,ide,s_res,e_res)
-    # from kg m-2 to m3 m-2
-    # accum
-    da_r=da[ids:ide,:,:].sum(dim=lvname)    
-    da_r=da_r-da[ids]*s_res/DP_SOI_LVS[ids]-da[ide]*e_res/DP_SOI_LVS[ide]
-    da_r=(da_r/const.RHO_WATER)/(end_dp-strt_dp)
+    if model_name=='cpsv3':
+        # from kg m-2 to m3 m-2
+        # accum
+        da_r=da[ids:ide,:,:].sum(dim=lvname)    
+        da_r=da_r-da[ids]*s_res/DP_SOI_LVS[ids]-da[ide]*e_res/DP_SOI_LVS[ide]
+        da_r=(da_r/const.RHO_WATER)/(end_dp-strt_dp)
+    elif model_name=='bcmm':
+        da_r=da[ids,:,:]
     return da_r
 
 def avg_soil_temp(da, aim_v, model_name, lvname):

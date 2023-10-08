@@ -10,16 +10,11 @@
     write_log(msg, lvl=20):
         write logging log to log file
     
-    parse_tswildcard(tgt_time, wildcard):
-        parse string with timestamp wildcard 
-        to datetime object
-
 """
 # ---imports---
 import logging
 import pkg_resources
 from . import const
-import re
 import shutil
 from tempfile import mkstemp
 
@@ -126,20 +121,6 @@ def write_log(msg, lvl=20):
     '''
 
     logging.log(lvl, msg)
-
-def parse_tswildcard(tgt_time, wildcard):
-    '''
-    parse string with timestamp wildcard to datetime object
-    '''
-    seg_str=wildcard.split('@')
-    parsed_str=''
-    for seg in seg_str:
-        if seg.startswith('%'):
-            parsed_str+=tgt_time.strftime(seg)
-        else:
-            parsed_str+=seg
-    return parsed_str
-
 
 # ---Unit test---
 if __name__ == '__main__':

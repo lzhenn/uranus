@@ -1,0 +1,25 @@
+src_v,aim_v,units,type,lvlmark,desc
+hur,RH,%,3d,PlevPt,3-d relative humidity
+ps,PSFC,Pa,2d,Lev, Surface pressure
+psl,PMSL,Pa,2d,PlevPt, Mean sea-level pressure
+ta,TT,K,3d,PlevPt,3-d air temperature
+ua,UU,m s-1,3d,PlevPt, 3-d wind u-component
+va,VV,m s-1,3d,PlevPt, 3-d wind v-component
+ta,TT,K,3d,PlevPt,3-d air temperature
+tos,SST,K,2d,None,sea surface temperature
+ua,UU,m s-1,3d,PlevPt, 3-d wind u-component
+va,VV,m s-1,3d,PlevPt, 3-d wind v-component
+zg,GHT,m,3d,PlevPt, 3-d geopotential height
+ua,UU,m s-1,2d,PlevPt, 10m wind u-component
+va,VV,m s-1,2d,PlevPt, 10m wind v-component
+hur,RH,%,2d,PlevPt,2-m relative humidity
+tas,TT,K,2d-soil,PlevPt, 2-m temperature
+tsl,SKINTEMP, K,2d-soil,PlevPt, Skin temperature
+tsl,ST000010,K,2d-soil,PlevPt, 0-10 cm soil temp 
+tsl,ST010040,K,2d-soil,PlevPt, 10-40 cm soil temp 
+tsl,ST040100,K,2d-soil,PlevPt, 40-100 cm soil temp 
+tsl,ST100200,K,2d-soil,PlevPt, 100-200 cm soil temp 
+mrsol,SM000010, m3/m-3,2d-soil,PlevPt, 0-10 cm soil moisture
+mrsol,SM010040, m3/m-3,2d-soil,PlevPt, 10-40 cm soil moisture
+mrsol,SM040100, m3/m-3,2d-soil,PlevPt, 40-100 cm soil moisture
+mrsol,SM100200, m3/m-3,2d-soil,PlevPt, 100-200 cm soil moisture

@@ -22,7 +22,7 @@ DRV_DIC={
     'cpsv3_wrf':{
         'use_ungrib':False,'atm_nfrq':'6H','atm_file_nfrq':'1D', 'frm_per_file':4,
         'vcoord':'sigmap', 'acoef':'hyam', 'bcoef':'hybm', 'psname':'PS', 
-        'lnd_file_nfrq':'1D', 'soillv':'CLM2', 'soil_dim_name':'levsoi',
+        'lnd_file_nfrq':'1D', 'soillv':'cpsv3', 'soil_dim_name':'levsoi',
         'atm_naming_pattern':'$I%Y%m%d%H$I.cam2.h4.$F%Y-%m-%d$F-00000.nc',
         'lnd_naming_pattern':'$I%Y%m%d%H$I.clm2.h2.$F%Y-%m-%d$F-00000.nc',
         'lats':np.linspace(-89.6559642468699, 89.6559642468699, 400), 
@@ -34,11 +34,22 @@ DRV_DIC={
     },
     'cfs_roms':{'ocn_naming_pattern':'ocnf$F%Y%m%d%H$F.01.$I%Y%m%d%H$I.grb2'},
     'hycom_roms':{'ocn_naming_pattern':'hycome_$F%Y%m%d%H$F.nc',},
+    
+     'bcmm_wrf':{
+        'use_ungrib':False,'atm_nfrq':'6H','atm_file_nfrq':'MS', 'frm_per_file':-1,
+        'vcoord':'p',  
+        'lnd_file_nfrq':'MS', 'soillv':'bcmm', 'soil_dim_name':'depth',
+        'atm_naming_pattern':'atm_$S_$F%Y_%m$F.nc4',
+        'lnd_naming_pattern':'lnd.$S.$F%Y%m$F.nc',
+        'lats':np.linspace(-90, 90, 145), 
+        'lons':np.linspace(0.0,358.75,288), 'plv':'PL18',
+    },
 }
 
 # Lower bottom level 
 SOILLV_DIC={
-    'CLM2':0.01*np.array([1.75, 4.51, 9.06, 16.55, 28.91, 49.29, 82.89, 138.28, 229.61, 380.19]),
+    'cpsv3':0.01*np.array([1.75, 4.51, 9.06, 16.55, 28.91, 49.29, 82.89, 138.28, 229.61, 380.19]),
+    'bcmm':np.array([0.0, 0.1, 0.4, 1.0, 2.0])
 }
 
 PLV_DIC={
@@ -46,12 +57,13 @@ PLV_DIC={
     'PL18':100.0*np.array([1000.0, 975.0, 950.0, 925.0, 900.0, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50])
 }
 
-# ROMS
+
+# -----------------------ROMS--------------------------
 
 # BASE TIME FOR ROMS
 BASE_TIME=datetime.datetime(1858, 11, 17, 0, 0)
 S2NS=1000000000
-HALF_DAY=43200000000000 # half day in nanoseconds
+HALF_DAY_NS=43200000000000 # half day in nanoseconds
 DAY_IN_SEC=86400
 HR_IN_SEC=3600
 # !!! FIXED DEPTH: NEVER CHANGE THIS BELOW !!!
