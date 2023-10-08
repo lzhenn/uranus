@@ -17,7 +17,9 @@ MACHINE_DIC={
         'domdb_root':'/home/lzhenn/array74/workspace/aegir-implement/domaindb/'
     }
 }
-
+for itm in ['133','132','111','100']:
+    MACHINE_DIC['hqlx'+itm]=MACHINE_DIC['hqlx74']
+                
 DRV_DIC={
     'cpsv3_wrf':{
         'use_ungrib':False,'atm_nfrq':'6H','atm_file_nfrq':'1D', 'frm_per_file':4,
