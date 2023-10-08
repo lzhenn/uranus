@@ -16,6 +16,7 @@ class WRFRocker:
     def __init__(self, uranus):
         self.uranus=uranus
         self.cfg=uranus.cfg
+        self.mach_name=self.cfg['URANUS']['machine_name']
         wrfcfg=self.cfg['WRF']
         self.run_maker=wrfcfg.getboolean('rock_wrf')
         self.rewrite_geog=wrfcfg.getboolean('rewrite_geo_em')
@@ -120,7 +121,7 @@ class WRFRocker:
         bashrc=mach_meta['bashrc']
         mpicmd=mach_meta['mpicmd']
         metgrid_np=mach_meta['metgrid_np']
-        cmd=f'source {bashrc}; cd {self.wps_root};{mpicmd} -np {metgrid_np} ./metgrid.exe'
+        cmd=f'ssh {self.mach_name} "source {bashrc}; cd {self.wps_root};{mpicmd} -np {metgrid_np} ./metgrid.exe"'
         utils.write_log(print_prefix+'Run metgrid.exe: '+cmd)
         subprocess.run(cmd, shell=True)
          
@@ -130,7 +131,7 @@ class WRFRocker:
         mpicmd=mach_meta['mpicmd']
         real_np=mach_meta['real_np']
         io.symlink_files(os.path.join(self.wps_root,'met_em.d*'), self.wrf_root)
-        cmd=f'source {bashrc}; cd {self.wrf_root};{mpicmd} -np {real_np} ./real.exe'
+        cmd=f'ssh {self.mach_name} "source {bashrc}; cd {self.wrf_root};{mpicmd} -np {real_np} ./real.exe"'
         utils.write_log(print_prefix+'Run real.exe: '+cmd)
         subprocess.run(cmd, shell=True)
     
@@ -139,7 +140,7 @@ class WRFRocker:
         bashrc=mach_meta['bashrc']
         mpicmd=mach_meta['mpicmd']
         wrf_np=self.ntasks_wrf
-        cmd=f'source {bashrc}; cd {self.wrf_root};{mpicmd} -np {wrf_np} ./wrf.exe'
+        cmd=f'ssh {self.mach_name} "source {bashrc}; cd {self.wrf_root};{mpicmd} -np {wrf_np} ./wrf.exe"'
         utils.write_log(print_prefix+'Run wrf.exe: '+cmd)
         subprocess.run(cmd, shell=True)
     

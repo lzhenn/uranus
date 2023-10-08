@@ -5,5 +5,6 @@ build
 *.egg-info
 dist
 sandbox
+case_ctrler
 test_case/fig
 test_case/output
