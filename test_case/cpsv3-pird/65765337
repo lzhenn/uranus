@@ -1,0 +1,61 @@
+/g6/cmme/COAWST-S2S/bashrc_coawst_run: line 62: ulimit: max memory size: cannot modify limit: Operation not permitted
+2023-10-19 00:18:39,442 - INFO : Uranus Initiation Done.
+2023-10-19 00:18:45,186 - INFO : lib.WRFController>>WRFMaker Initiation Done.
+2023-10-19 00:18:45,188 - INFO : lib.io>>Clean workspace for /g6/cmme/COAWST-S2S/model/WPS-4.1/...
+2023-10-19 00:18:45,200 - INFO : lib.io>>Clean workspace for /g6/cmme/COAWST-S2S/model/WRF-4.1.2/run/...
+2023-10-19 00:18:45,200 - INFO : lib.io>>Copy files from /g6/cmme/COAWST-S2S/data/domaindb/s2s_china/geo_em* to /g6/cmme/COAWST-S2S/model/WPS-4.1/...
+2023-10-19 00:18:45,854 - INFO : lib.WRFController>>Run metgrid.exe: source /g6/cmme/COAWST-S2S/bashrc_coawst_run; cd /g6/cmme/COAWST-S2S/model/WPS-4.1/;sbatch -N 1 -n 16 ./metgrid.exe.sh
+/g6/cmme/COAWST-S2S/bashrc_coawst_run: line 62: ulimit: max memory size: cannot modify limit: Operation not permitted
+2023-10-19 00:18:47,274 - INFO : lib.WRFController>>(10s check) On:           65765339    normal  metgrid     cmme PD       0:00      1 (None)
+          65765337    serial step2_co     cmme  R       0:40      1 cmac0011
+
+2023-10-19 00:18:57,315 - INFO : lib.WRFController>>(10s check) On:           65765339    normal  metgrid     cmme  R       0:10      1 cmac1538
+          65765337    serial step2_co     cmme  R       0:50      1 cmac0011
+
+2023-10-19 00:19:07,355 - INFO : lib.WRFController>>(10s check) On:           65765339    normal  metgrid     cmme  R       0:20      1 cmac1538
+          65765337    serial step2_co     cmme  R       1:00      1 cmac0011
+
+2023-10-19 00:19:17,393 - INFO : lib.io>>Symlink files from /g6/cmme/COAWST-S2S/model/WPS-4.1/met_em.d* to /g6/cmme/COAWST-S2S/model/WRF-4.1.2/run/...
+2023-10-19 00:19:17,401 - INFO : lib.WRFController>>Run real.exe: source /g6/cmme/COAWST-S2S/bashrc_coawst_run; cd /g6/cmme/COAWST-S2S/model/WRF-4.1.2/run/;sbatch -N 1 -n 16 ./real.exe.sh
+/g6/cmme/COAWST-S2S/bashrc_coawst_run: line 62: ulimit: max memory size: cannot modify limit: Operation not permitted
+2023-10-19 00:19:18,637 - INFO : lib.WRFController>>(10s check) On:           65765340    normal real.exe     cmme PD       0:00      1 (None)
+          65765337    serial step2_co     cmme  R       1:11      1 cmac0011
+
+2023-10-19 00:19:28,676 - INFO : lib.WRFController>>(10s check) On:           65765340    normal real.exe     cmme  R       0:09      1 cmac1538
+          65765337    serial step2_co     cmme  R       1:21      1 cmac0011
+
+2023-10-19 00:19:38,707 - INFO : lib.WRFController>>(10s check) On:           65765340    normal real.exe     cmme  R       0:19      1 cmac1538
+          65765337    serial step2_co     cmme  R       1:31      1 cmac0011
+
+2023-10-19 00:19:48,852 - INFO : lib.WRFController>>(10s check) On:           65765340    normal real.exe     cmme  R       0:29      1 cmac1538
+          65765337    serial step2_co     cmme  R       1:41      1 cmac0011
+
+2023-10-19 00:19:58,899 - INFO : lib.WRFController>>(10s check) On:           65765340    normal real.exe     cmme  R       0:39      1 cmac1538
+          65765337    serial step2_co     cmme  R       1:51      1 cmac0011
+
+2023-10-19 00:20:09,330 - INFO : lib.io>>Copy files from /g6/cmme/COAWST-S2S/control/uranus/uranus/nml_db/s2s_china/*in to /g6/cmme/COAWST-S2S/model/COAWST_Aegir/Projects/s2s_china...
+2023-10-19 00:20:09,516 - INFO : lib.io>>Symlink files from /g6/cmme/COAWST-S2S/data/domaindb/s2s_china/scrip* to /g6/cmme/COAWST-S2S/model/COAWST_Aegir/Projects/s2s_china...
+2023-10-19 00:20:09,520 - INFO : lib.io>>Copy files from /g6/cmme/COAWST-S2S/model/WRF-4.1.2/run/namelist.input to /g6/cmme/COAWST-S2S/model/COAWST_Aegir...
+2023-10-19 00:20:09,588 - INFO : lib.io>>Symlink files from /g6/cmme/COAWST-S2S/model/WRF-4.1.2/run/wrf[l,f,i,b]* to /g6/cmme/COAWST-S2S/model/COAWST_Aegir...
+2023-10-19 00:20:09,656 - INFO : lib.io>>Symlink files from /g6/cmme/COAWST-S2S/data/domaindb/s2s_china/*omp.nc to /g6/cmme/COAWST-S2S/model/COAWST_Aegir/Projects/s2s_china...
+2023-10-19 00:20:09,820 - INFO : Uranus>>Run coawstM: time mpirun -n 160 ./coawstM /g6/cmme/COAWST-S2S/model/COAWST_Aegir/Projects/s2s_china/coupling.in >& /g6/cmme/COAWST-S2S/model/COAWST_Aegir/coawstM.log
+/g6/cmme/COAWST-S2S/bashrc_coawst_run: line 62: ulimit: max memory size: cannot modify limit: Operation not permitted
+2023-10-19 00:20:11,457 - INFO : Uranus>>(60s check) On:           65765381    normal  coawstm     cmme PD       0:00      5 (None)
+          65765337    serial step2_co     cmme  R       2:04      1 cmac0011
+
+2023-10-19 00:21:11,545 - INFO : Uranus>>(60s check) On:           65765381    normal  coawstm     cmme  R       0:59      5 cmac[1411-1412,1414-1416]
+          65765337    serial step2_co     cmme  R       3:04      1 cmac0011
+
+2023-10-19 00:22:11,634 - INFO : Uranus>>(60s check) On:           65765381    normal  coawstm     cmme  R       1:59      5 cmac[1411-1412,1414-1416]
+          65765337    serial step2_co     cmme  R       4:04      1 cmac0011
+
+2023-10-19 00:23:11,684 - INFO : Uranus>>(60s check) On:           65765381    normal  coawstm     cmme  R       2:59      5 cmac[1411-1412,1414-1416]
+          65765337    serial step2_co     cmme  R       5:04      1 cmac0011
+
+2023-10-19 00:24:11,768 - INFO : Uranus>>(60s check) On:           65765381    normal  coawstm     cmme  R       3:59      5 cmac[1411-1412,1414-1416]
+          65765337    serial step2_co     cmme  R       6:04      1 cmac0011
+
+2023-10-19 00:25:11,801 - INFO : Uranus>>(60s check) On:           65765381    normal  coawstm     cmme  R       4:59      5 cmac[1411-1412,1414-1416]
+          65765337    serial step2_co     cmme  R       7:04      1 cmac0011
+
+slurmstepd: error: *** JOB 65765337 ON cmac0011 CANCELLED AT 2023-10-19T00:25:27 ***

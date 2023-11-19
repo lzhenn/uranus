@@ -15,7 +15,33 @@ MACHINE_DIC={
         'aegir_root':'/home/lzhenn/array74/Njord_Calypso/COAWST_Aegir',
         'cfgdb_root':'/home/lzhenn/array74/workspace/aegir-implement/db/',
         'domdb_root':'/home/lzhenn/array74/workspace/aegir-implement/domaindb/'
+    },
+    'hqlx86':{
+        'bashrc':'/home/metctm1/.bashrc_i20_cwst38',
+        'mpicmd':'mpirun', 'corespernode':48, 'nodes':1,
+        'metgrid_np':16, 'real_np':16, 'wrf_np':32,
+        'aegir_root':'/home/metctm1/array_hq86/COAWSTv38',
+        'cfgdb_root':'/disk/r086/metctm1/work/uranus/uranus/nml_db/',
+        'domdb_root':'/home/lzhenn/array74/workspace/aegir-implement/domaindb/'
+    },
+    'th2':{
+        'bashrc':'/BIGDATA2/sysu_xmhu_1/s2s_cpl/bashrc',
+        'mpicmd':'yhrun', 'corespernode':24, 'nodes':5,
+        'metgrid_np':16, 'real_np':16, 'wrf_np':24,
+        'aegir_root':'/BIGDATA2/sysu_xmhu_1/s2s_cpl/model/COAWST_Aegir',
+        'cfgdb_root':'/BIGDATA2/sysu_xmhu_1/s2s_cpl/control/uranus/uranus/nml_db/',
+        'domdb_root':'/BIGDATA2/sysu_xmhu_1/s2s_cpl/data/domaindb/'
+    },    
+    'pird':{
+        'bashrc':'/g6/cmme/COAWST-S2S/bashrc_coawst_run',
+        'mpicmd':'sbatch', 'corespernode':32, 'nodes':3,
+        'metgrid_np':16, 'real_np':16, 'wrf_np':64,
+        'aegir_root':'/g6/cmme/COAWST-S2S/model/COAWST_Aegir',
+        'opexe_root':'/g6/cmme/COAWST-S2S/model/op_model/COAWST_op/',
+        'cfgdb_root':'/g6/cmme/COAWST-S2S/control/uranus/uranus/nml_db/',
+        'domdb_root':'/g6/cmme/COAWST-S2S/data/domaindb/'
     }
+
 }
 for itm in ['133','132','111','100']:
     MACHINE_DIC['hqlx'+itm]=MACHINE_DIC['hqlx74']

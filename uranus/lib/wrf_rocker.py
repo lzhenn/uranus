@@ -4,6 +4,7 @@ import os, shutil, cftime, subprocess
 import pandas as pd
 import xarray as xr
 import numpy as np
+import time
 from scipy.io import FortranFile
 from . import utils, io, const, mathlib
 
@@ -27,7 +28,7 @@ class WRFRocker:
         self.run_metgrid=wrfcfg.getboolean('run_metgrid')
         self.run_real=wrfcfg.getboolean('run_real')
         self.run_wrf=wrfcfg.getboolean('run_wrf')
-        self.drv_root=utils.valid_path(wrfcfg['drv_root'])
+        self.drv_root=utils.valid_path(utils.parse_fmt_timepath(self.uranus.sim_strt_time, wrfcfg['drv_root']))
         self.wps_root, self.wrf_root=utils.valid_path(wrfcfg['wps_root']), utils.valid_path(wrfcfg['wrf_root'])
         self.ntasks_wrf=wrfcfg.getint('ntasks_wrf')
         self.mach_meta=self.uranus.machine_dic
@@ -124,8 +125,21 @@ class WRFRocker:
         cmd=utils.build_wrfcmd(
             self.mach_name, bashrc, self.wps_root, mpicmd, metgrid_np, 'metgrid.exe')
         utils.write_log(print_prefix+'Run metgrid.exe: '+cmd)
-        subprocess.run(cmd, shell=True)
-         
+        rcode=subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+        jobid=rcode.stdout.decode().split()[3]
+        
+        # special for pird
+        
+        chck_cmd='squeue | grep cmme'
+        rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
+        stdout=rcode.stdout.decode()
+        timer=30
+        while jobid in stdout:
+            utils.write_log(f'{print_prefix}({timer}s check) On: {stdout}')
+            time.sleep(timer)
+            rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
+            stdout=rcode.stdout.decode()
+    
     def real(self):
         mach_meta=self.mach_meta
         bashrc=mach_meta['bashrc']
@@ -135,7 +149,20 @@ class WRFRocker:
         cmd=utils.build_wrfcmd(
             self.mach_name, bashrc, self.wrf_root, mpicmd, real_np, 'real.exe')
         utils.write_log(print_prefix+'Run real.exe: '+cmd)
-        subprocess.run(cmd, shell=True)
+        rcode=subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+        jobid=rcode.stdout.decode().split()[3]
+        
+        # special for pird
+        
+        chck_cmd='squeue | grep cmme'
+        rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
+        stdout=rcode.stdout.decode()
+        timer=30
+        while jobid in stdout:
+            utils.write_log(f'{print_prefix}({timer}s check) On: {stdout}')
+            time.sleep(timer)
+            rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
+            stdout=rcode.stdout.decode()
     
     def wrf(self):
         mach_meta=self.mach_meta
@@ -175,7 +202,7 @@ class WRFRocker:
             kw='atm',special=special)
         # lnd 
         if self.drv_type in ['cpsv3','bcmm']:
-            self.lnd_root=self.cfg[self.drv_type]['lnd_root']
+            self.lnd_root=utils.parse_fmt_timepath(self.uranus.sim_strt_time, self.cfg[self.drv_type]['lnd_root'])
             self.lndfn_lst, _=io.gen_patternfn_lst(
                 self.lnd_root, drv_dic, init_time, end_time, 
                 kw='lnd',special=special)
@@ -205,7 +232,7 @@ class WRFRocker:
             ps=io.sel_frm(ds[drv_dic['psname']], tf, itf)
         for idy, itm in df_meta.iterrows():
             src_v, aim_v=itm['src_v'], itm['aim_v']
-            # skip comments or ocean files
+            # skip comments
             if src_v.startswith('#'):
                 continue
             lvltype=itm['type']

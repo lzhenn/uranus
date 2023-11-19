@@ -14,7 +14,7 @@ import sys, os, subprocess
 import logging, logging.config
 import shutil
 import datetime
-
+import time
 from .lib import cfgparser, utils, const, io
 
 import warnings
@@ -46,26 +46,33 @@ class Uranus:
         self.rock_roms=self.cfg['ROMS'].getboolean('rock_roms')
         self.mode=cfg['uranus_mode']
         self.nml_temp=cfg['nml_temp']
+        self.sim_strt_time=utils.parse_init_time(cfg['model_init_ts'])
+        self.run_days=int(cfg['model_run_days'])
+        self.sim_end_time=self.sim_strt_time+datetime.timedelta(days=self.run_days)
+
+
         self.machine_name=cfg['machine_name']
-        
-        
         self.machine_dic=const.MACHINE_DIC[self.machine_name]
+        try:
+            self.machine_dic[f'{self.mode}_root']=cfg['cwst_path']
+        except KeyError:
+            pass
         self.bashrc=self.machine_dic['bashrc']
         self.mpicmd=self.machine_dic['mpicmd']
- 
         self.cfgdb_root=self.machine_dic['cfgdb_root']
         self.domdb_root=self.machine_dic['domdb_root']
         if self.mode=='shu':
             self.cplexe_root=self.cfg['WRF']['wrf_root']
         else:
-            self.cplexe_root=self.machine_dic[f'{self.mode}_root']
+            if 'T-' in cfg['model_init_ts']:
+                self.machine_dic[f'{self.mode}_root']=self.machine_dic['opexe_root']
+                self.cplexe_root=self.machine_dic['opexe_root']
+            else:
+                self.cplexe_root=self.machine_dic[f'{self.mode}_root']
+        
         self.proj_root=os.path.join(
             self.cplexe_root,'Projects',self.nml_temp)
         
-        self.sim_strt_time=datetime.datetime.strptime(
-            cfg['model_init_ts'],'%Y%m%d%H')
-        self.run_days=int(cfg['model_run_days'])
-        self.sim_end_time=self.sim_strt_time+datetime.timedelta(days=self.run_days)
         
         self.arch_flag=cfg.getboolean('archive_flag')
         self.arch_root=utils.parse_fmt_timepath(self.sim_strt_time, cfg['arch_root'])
@@ -128,22 +135,58 @@ class Uranus:
             self.romsmaker.prepare_rock()
         
             # run coawstM
-            cmd=f'source {self.bashrc}; cd {self.cplexe_root};'
-            cmd+=f'{self.mpicmd} -np {self.ntasks_all} ./coawstM {cpl_in}'
-            cmd+=f' >& {self.cplexe_root}/coawstM.log'
-            utils.write_log(print_prefix+'Run coawstM: '+cmd)
-            subprocess.run(cmd, shell=True)
-        
+            # special for cmme
+            if self.machine_name == 'pird':
+                cmd=f'mpirun -n {self.ntasks_all} ./coawstM'
+            else:
+                cmd=utils.build_wrfcmd(
+                    self.machine_name, self.bashrc, self.cplexe_root, 
+                    self.mpicmd, self.ntasks_all, 'coawstM')
+ 
+            relative_cpl_in=os.path.join(
+                '.','Projects',self.nml_temp,'coupling.in')
+            cmd+=f' {relative_cpl_in}'
+            cmd+=f' >& {self.cplexe_root}/coawstM.log' 
+            
+            if self.machine_name == 'pird':
+                cwst_sbatch=f'{self.cplexe_root}/coawstM.sh'
+                utils.sedline('#SBATCH -n',f'#SBATCH -n {self.ntasks_all}', cwst_sbatch) 
+                utils.sedline('time mpirun', cmd, cwst_sbatch) 
+                batchcmd=utils.build_wrfcmd(
+                self.machine_name, self.bashrc, self.cplexe_root, 
+                    self.mpicmd, self.ntasks_all, 'coawstM')
+                utils.write_log(print_prefix+'Run coawstM: '+batchcmd)
+                rcode=subprocess.run(batchcmd, shell=True, stdout=subprocess.PIPE)
+                jobid=rcode.stdout.decode().split()[3]
+                # special for pird
+                chck_cmd='squeue | grep cmme'
+                rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
+                stdout=rcode.stdout.decode()
+                timer=180
+                while jobid in stdout:
+                    utils.write_log(f'{print_prefix}({timer}s check) On: {stdout}')
+                    time.sleep(timer)
+                    rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
+                    stdout=rcode.stdout.decode()
+            else:
+                utils.write_log(print_prefix+'Run coawstM: '+cmd)
+                rcode=subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+                
         if self.arch_flag:
             self.archive_data()
     
     def archive_data(self):
         if not(os.path.exists(self.arch_root)):
             utils.write_log(print_prefix+'mkdir '+self.arch_root)
-            os.mkdir(self.arch_root)
-            file_patterns=['wrf[o,r,x]*','*nc']
-            for itm in file_patterns:
-                io.move_files(os.path.join(self.cplexe_root,itm), self.arch_root)
+            os.makedirs(self.arch_root)
+        file_patterns=['wrf[o,r,x]*','*nc']
+        for itm in file_patterns:
+            cmd=f'mv {os.path.join(self.cplexe_root,itm)} {self.arch_root}'
+            utils.write_log(print_prefix+'Archive: '+cmd)
+            rcode=subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+        
+        #for itm in file_patterns:
+        #    io.move_files(os.path.join(self.cplexe_root,itm), self.arch_root)
     def _setup_logging(self):
         """
         Configures the logging module using the 

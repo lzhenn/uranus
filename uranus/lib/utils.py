@@ -16,15 +16,32 @@ import logging
 import pkg_resources
 from . import const
 import shutil
+import datetime
 from tempfile import mkstemp
 
 def build_wrfcmd(mach_name, bashrc, exeroot, mpicmd, ntasks, exename):
+    mach_dic=const.MACHINE_DIC[mach_name]
+    nnodes=max(1,ntasks//mach_dic['corespernode'])
     if 'hqlx' in mach_name:
         return f'ssh {mach_name} "source {bashrc}; cd {exeroot};{mpicmd} -np {ntasks} ./{exename}"'
+    elif mach_name == 'th2':
+        return f'source {bashrc}; cd {exeroot};{mpicmd} -N {nnodes} -n {ntasks} ./{exename}'
+    elif mach_name == 'pird':
+        return f'source {bashrc}; cd {exeroot};{mpicmd} -N {nnodes} -n {ntasks} ./{exename}.sh'
     else:
         return f'source {bashrc}; cd {exeroot};{mpicmd} -np {ntasks} ./{exename}'
     
-
+def parse_init_time(tstr):
+    try:
+        ts=datetime.datetime.strptime(
+            tstr,'%Y%m%d%H')
+    except:
+        if tstr.startswith('T-'):
+            num_days = int(tstr[2:])
+            today = datetime.datetime.today()
+            today = today.replace(hour=0,minute=0,second=0,microsecond=0)
+            ts=today - datetime.timedelta(days=num_days)
+    return ts
 def parse_fmt_timepath(tgt_time, fmtpath):
     '''
     parse time string to datetime object

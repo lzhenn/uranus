@@ -4,7 +4,7 @@
 import os, glob, shutil
 import numpy as np
 import pandas as pd
-import struct
+import struct, time
 from . import utils, const
 
 # ---Module regime consts and variables---
@@ -24,11 +24,12 @@ def move_files(src_path, dest_path):
 def symlink_files(src_path, dest_path):
     utils.write_log(
         f'{print_prefix}Symlink files from {src_path} to {dest_path}...')
-    for file in glob.glob(rf'{src_path}'):
-        link_name = os.path.join(dest_path, os.path.basename(file))
+    for fn in glob.glob(rf'{src_path}'):
+        link_name = os.path.join(dest_path, os.path.basename(fn))
         if os.path.exists(link_name):
             os.remove(link_name)
-        os.symlink(file, link_name)        
+        time.sleep(1)
+        os.symlink(fn, link_name)        
 # ---Classes and Functions---
 def del_files(tgt_path, fnpatterns):
     file_list = os.listdir(tgt_path)

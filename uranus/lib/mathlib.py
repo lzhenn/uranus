@@ -57,9 +57,11 @@ def hybrid2pressure(da,ap,b,ps,PLVS):
     #print(da.values.shape)
     nz, nlat, nlon=da.values.shape
     da_new=da.copy()[0:len(PLVS),:,:]
-    da_new=da_new.rename({'lev':'plev'})
+    try:
+        da_new=da_new.rename({'lev':'plev'})
+    except ValueError:
+        pass
     da_new=da_new.assign_coords({'plev':PLVS})
-    
     pa3d=np.broadcast_to(ps.values, (nz, nlat, nlon))
     pa3d=np.swapaxes(pa3d,0,2) 
     # get hybrid level

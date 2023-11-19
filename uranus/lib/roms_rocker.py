@@ -1,6 +1,6 @@
 #/usr/bin/env python3
 """Build ROMS workflow"""
-import os 
+import os, datetime
 import pandas as pd
 import xarray as xr
 import numpy as np
@@ -39,6 +39,8 @@ class ROMSRocker:
         # build meta
         self.frm_time_series=pd.date_range(
             start=self.strt_time, end=self.end_time, freq=self.drv_dic['ocn_nfrq'])
+        if len(self.frm_time_series)>1:
+            self.ocn_nfrq=int((self.frm_time_series[1]-self.frm_time_series[0]).total_seconds())
         self.ocnfn_lst, self.file_time_series=io.gen_patternfn_lst(
             self.drv_root, self.drv_dic, self.strt_time, self.end_time, kw='ocn')
 
@@ -59,24 +61,25 @@ class ROMSRocker:
         grdname=os.path.join('Projects', nml_temp, 'roms_d01_omp.nc')
         ininame=os.path.join('Projects', nml_temp, 'coawst_ini.nc')
         
-        nclmfiles=len(self.file_time_series)
         clmname,bryname='',''
-        for tf in self.file_time_series[:-1]: 
-            tf_str=tf.strftime('%Y%m%d')
+        for tf in self.file_time_series: 
+            tf_str=tf.strftime('%Y%m%d%H')
             clmname+=os.path.join('Projects', nml_temp, f'coawst_clm_{tf_str}.nc |\n')
             bryname+=os.path.join('Projects', nml_temp, f'coawst_bdy_{tf_str}.nc |\n')
-       
-        tf_str=self.file_time_series[-1].strftime('%Y%m%d')
+        tf_close=self.file_time_series[-1]+datetime.timedelta(days=1)
+        tf_str=tf_close.strftime('%Y%m%d%H')
         clmname+=os.path.join('Projects', nml_temp, f'coawst_clm_{tf_str}.nc')
         bryname+=os.path.join('Projects', nml_temp, f'coawst_bdy_{tf_str}.nc')
     
         
+        tf_start=self.file_time_series[0]       
+        tf_str=tf_start.strftime('%Y%m%d')
         sed_dic={
             'NtileI':self.uranus.ntasks_iocn, 'NtileJ':self.uranus.ntasks_jocn,
             'NTIMES':ntimes, 'DT':f"{self.dt:.1f}d0", 'NRST':nrst, 'NHIS':nhis, 
             'NDEFHIS':ndefhis, 'NDIA':nhis, 'NAVG':nhis, 
             'GRDNAME':grdname, 'ININAME':ininame, 'CLMNAME':clmname, 'BRYNAME':bryname,
-            'NCLMFILES':nclmfiles,'NBCFILES':nclmfiles,
+            'TIME_REF':f"{tf_str}.0d0"
         }
         for key, itm in sed_dic.items():
             utils.sedline(key, f'{key} == {itm}', roms_in)
@@ -115,7 +118,7 @@ class ROMSRocker:
             return
         utils.write_log(
             print_prefix+'build icbcs from %s to %s...'%(
-                self.strt_time.strftime('%Y%m%d'),self.end_time.strftime('%Y%m%d')))
+                self.strt_time.strftime('%Y%m%d%H'),self.end_time.strftime('%Y%m%d%H')))
         
         # load domain file
         self.load_domain()
@@ -147,21 +150,21 @@ class ROMSRocker:
             self.dp_idx=mathlib.assign_depth_idx(
                 z_rho, self.mask)
 
+            # Hot Spot: May Comment out 3D interp for test
             for roms_var in ['temp','salt','u','v']:
-            #for roms_var in ['temp']:
                 self.inter3d(roms_var)
             if tf==self.strt_time:
                 # pkg time
-                time_offset=self.strt_time - const.BASE_TIME
-                self.ds_smp['ocean_time'].values[:]=int(time_offset.total_seconds())*const.S2NS#+const.HALF_DAY
+                #time_offset=self.strt_time - const.BASE_TIME
+                #self.dstart=time_offset.total_seconds()/const.DAY_IN_SEC
+                self.ds_smp['ocean_time'].values[:]=0#+const.HALF_DAY
                 self.ds_smp=self.ds_smp.assign_coords({'ocean_time':self.ds_smp['ocean_time']})
-
                 # output
                 inifn=os.path.join(self.proj_root, 'coawst_ini.nc')
-                self.ds_smp.to_netcdf(inifn)
+                self.ds_smp.to_netcdf(inifn, engine='netcdf4', format='NETCDF3_64BIT')
                 utils.write_log(print_prefix+'build initial conditions done!')
-            self.build_clm(tf)
-            self.build_bdy(tf)
+            self.build_clm(it, tf)
+            self.build_bdy(it, tf)
    
     def load_raw(self, it):
         """ load raw GCM files """
@@ -313,10 +316,10 @@ class ROMSRocker:
         else: 
             self.ds_smp[roms_varname].values=data_template.values
         
-    def build_clm(self, time_frm):
+    def build_clm(self, idt, time_frm):
         '''Build climatology file'''
         utils.write_log(
-            print_prefix+'build clm file@%s...' % time_frm.strftime('%Y%m%d'))
+            print_prefix+'build clm file@%s...' % time_frm.strftime('%Y%m%d%H'))
         clmsmpfn=os.path.join(self.domdb_root, self.uranus.nml_temp,'roms_d01_clmsmp.nc')
         ds_clm=xr.load_dataset(clmsmpfn)
         # loop the variables to assign values
@@ -324,21 +327,32 @@ class ROMSRocker:
             ds_clm[varname].values=self.ds_smp[varname].values
  
         # deal with time vars 
-        time_offset=time_frm - const.BASE_TIME
+        #time_offset=time_frm - const.BASE_TIME
         for var in const.CLM_TIME_VAR:
             var_time=ds_clm[var+'_time']
             # pkg time
-            var_time.values[:]=int(time_offset.total_seconds())*const.S2NS+const.HALF_DAY_NS*2
+            var_time.values[:]=idt*self.ocn_nfrq*const.S2NS
             #ds_clm=ds_clm.assign_coords({var:var_time})
         
         clmfn=os.path.join(
-            self.proj_root,'coawst_clm_%s.nc'% time_frm.strftime('%Y%m%d'))
-        ds_clm.to_netcdf(clmfn)
-
-    def build_bdy(self, time_frm):
+            self.proj_root,'coawst_clm_%s.nc'% time_frm.strftime('%Y%m%d%H'))
+        ds_clm.to_netcdf(clmfn, engine='netcdf4', format='NETCDF3_64BIT')
+        '''
+        # add one additional bdy file to cover the end time
+        if time_frm==self.frm_time_series[-1]:
+            time_frm=self.frm_time_series[-1]+datetime.timedelta(
+                    seconds=self.ocn_nfrq)
+            for var in const.CLM_TIME_VAR:
+                var_time=ds_clm[var+'_time']
+                var_time.values[:]=(idt+1)*self.ocn_nfrq*const.S2NS
+            clmfn=os.path.join(
+                self.proj_root,'coawst_clm_%s.nc'% time_frm.strftime('%Y%m%d%H'))
+            ds_clm.to_netcdf(clmfn, engine='netcdf4', format='NETCDF3_64BIT')
+        '''
+    def build_bdy(self, idt, time_frm):
         '''Build bdy file'''
         utils.write_log(
-            print_prefix+'build bdy file@%s...' % time_frm.strftime('%Y%m%d'))
+            print_prefix+'build bdy file@%s...' % time_frm.strftime('%Y%m%d%H'))
         bdysmpfn=os.path.join(
             self.domdb_root, self.uranus.nml_temp,'roms_d01_bdysmp.nc')
         ds_bdy=xr.load_dataset(bdysmpfn)
@@ -363,16 +377,12 @@ class ROMSRocker:
             var_bdy=varname+'_east'
             ds_bdy[var_bdy].values=self.ds_smp[varname].values[:,:,:,-1]
         # deal with time vars 
-        time_offset=time_frm - const.BASE_TIME
         for var in const.BDY_TIME_VAR:
             var_time=ds_bdy[var+'_time']
-            # pkg time
-            var_time.values[:]=int(time_offset.total_seconds())*const.S2NS+const.HALF_DAY_NS*2
+            var_time.values[:]=idt*self.ocn_nfrq*const.S2NS
             #ds_bdy=ds_bdy.assign_coords({var:var_time})
 
         bdyfn=os.path.join(
-            self.proj_root,'coawst_bdy_%s.nc'% time_frm.strftime('%Y%m%d'))
-        ds_bdy.to_netcdf(bdyfn)
-
-
-  
+            self.proj_root,'coawst_bdy_%s.nc'% time_frm.strftime('%Y%m%d%H'))
+        ds_bdy.to_netcdf(bdyfn, engine='netcdf4', format='NETCDF3_64BIT')
+ 
