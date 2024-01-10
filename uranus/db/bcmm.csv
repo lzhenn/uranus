@@ -6,7 +6,7 @@ ta,TT,K,3d,PlevPt,3-d air temperature
 ua,UU,m s-1,3d,PlevPt, 3-d wind u-component
 va,VV,m s-1,3d,PlevPt, 3-d wind v-component
 ta,TT,K,3d,PlevPt,3-d air temperature
-tos,SST,K,2d,None,sea surface temperature
+tos,SST,K,2d,Ocn,sea surface temperature
 ua,UU,m s-1,3d,PlevPt, 3-d wind u-component
 va,VV,m s-1,3d,PlevPt, 3-d wind v-component
 zg,GHT,m,3d,PlevPt, 3-d geopotential height

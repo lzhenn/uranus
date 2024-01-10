@@ -4,7 +4,7 @@ import datetime
 PKG_NAME = 'uranus'
 
 # WRF
-UNGRIB_CLEAN_LIST=['CFS', 'ERA', 'SST', 'PFILE', 'GFS', 'CPSV3']
+UNGRIB_CLEAN_LIST=['CFS', 'ERA', 'SST', 'PFILE', 'GFS', 'CPSV3','BCMM']
 METGRID_CLEAN_LIST=['met_em']
 WRF_CLEAN_LIST=['met_em','wrfinput_','wrflowinp_','wrffda_','wrfrst_']
 MACHINE_DIC={
@@ -13,7 +13,7 @@ MACHINE_DIC={
         'mpicmd':'mpirun', 'corespernode':128, 'nodes':1,
         'metgrid_np':16, 'real_np':16, 'wrf_np':32,
         'aegir_root':'/home/lzhenn/array74/Njord_Calypso/COAWST_Aegir',
-        'cfgdb_root':'/home/lzhenn/array74/workspace/aegir-implement/db/',
+        'cfgdb_root':'/home/lzhenn/array74/workspace/uranus/uranus/nml_db/',
         'domdb_root':'/home/lzhenn/array74/workspace/aegir-implement/domaindb/'
     },
     'hqlx86':{
@@ -43,7 +43,7 @@ MACHINE_DIC={
     }
 
 }
-for itm in ['133','132','111','100']:
+for itm in ['47','62','65','69','129','130','133','132','111','100']:
     MACHINE_DIC['hqlx'+itm]=MACHINE_DIC['hqlx74']
                 
 DRV_DIC={

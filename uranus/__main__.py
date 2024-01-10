@@ -32,13 +32,17 @@ class Uranus:
     Uranus is a class to drive the system
     '''
 
-    def __init__(self, cfgfn='config.case.ini'):
+    def __init__(self, cfgfn='config.case.ini',cfg=None):
         self._setup_logging()
 
-        if not(os.path.exists(os.path.join(CWD,cfgfn))):
-            utils.write_log('config file not exist, copy from pkg...')
-            copy_cfg(os.path.join(CWD,cfgfn))
-        self.cfg=cfgparser.read_cfg(os.path.join(CWD,cfgfn))
+        if cfg is None:
+            if not(os.path.exists(os.path.join(CWD,cfgfn))):
+                utils.write_log('config file not exist, copy from pkg...')
+                copy_cfg(os.path.join(CWD,cfgfn))
+            self.cfg=cfgparser.read_cfg(os.path.join(CWD,cfgfn))
+        else:
+            utils.write_log('use passed config...')
+            self.cfg=cfg
         cfg=self.cfg['URANUS']
         
         self.rock_flg=cfg.getboolean('rock_cpl')

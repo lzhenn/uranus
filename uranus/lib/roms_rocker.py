@@ -21,9 +21,18 @@ class ROMSRocker:
         """ construct maker obj """
         self.uranus=uranus
         self.cfg=uranus.cfg
+        try:
+            self.version=self.cfg['cwst_version']
+        except:
+            self.version='3.8'
+            utils.write_log(print_prefix+'no version in cfg, use 3.8')
         romscfg=self.cfg['ROMS']
         self.run_maker=romscfg.getboolean('gen_roms_icbc')
         self.strt_time,self.end_time=uranus.sim_strt_time,uranus.sim_end_time
+        
+        time_offset=self.strt_time - const.BASE_TIME
+        self.dstart=time_offset.total_seconds()/const.DAY_IN_SEC
+
         self.drv_type=romscfg['drv_type']
         self.drv_dic=const.DRV_DIC[self.drv_type+'_roms']
         self.drv_root=utils.parse_fmt_timepath(self.strt_time, romscfg['drv_root'])
@@ -56,7 +65,7 @@ class ROMSRocker:
         nrst=self.nrst*const.DAY_IN_SEC//self.dt
         nhis=self.nhis*const.HR_IN_SEC//self.dt 
         # only use half day
-        ndefhis=const.DAY_IN_SEC//self.dt//2
+        ndefhis=const.DAY_IN_SEC//self.dt
         
         grdname=os.path.join('Projects', nml_temp, 'roms_d01_omp.nc')
         ininame=os.path.join('Projects', nml_temp, 'coawst_ini.nc')
@@ -77,9 +86,10 @@ class ROMSRocker:
         sed_dic={
             'NtileI':self.uranus.ntasks_iocn, 'NtileJ':self.uranus.ntasks_jocn,
             'NTIMES':ntimes, 'DT':f"{self.dt:.1f}d0", 'NRST':nrst, 'NHIS':nhis, 
-            'NDEFHIS':ndefhis, 'NDIA':nhis, 'NAVG':nhis, 
+            'NDEFHIS':ndefhis, 'NDIA':nhis, #'NAVG':nhis, 
             'GRDNAME':grdname, 'ININAME':ininame, 'CLMNAME':clmname, 'BRYNAME':bryname,
-            'TIME_REF':f"{tf_str}.0d0"
+            'DSTART':f'{self.dstart:.1f}d0',
+            #'TIME_REF':f"{tf_str}.0d0"
         }
         for key, itm in sed_dic.items():
             utils.sedline(key, f'{key} == {itm}', roms_in)
@@ -155,13 +165,11 @@ class ROMSRocker:
                 self.inter3d(roms_var)
             if tf==self.strt_time:
                 # pkg time
-                #time_offset=self.strt_time - const.BASE_TIME
-                #self.dstart=time_offset.total_seconds()/const.DAY_IN_SEC
-                self.ds_smp['ocean_time'].values[:]=0#+const.HALF_DAY
+                self.ds_smp['ocean_time'].values[:]=int(self.dstart*const.DAY_IN_SEC)*const.S2NS
                 self.ds_smp=self.ds_smp.assign_coords({'ocean_time':self.ds_smp['ocean_time']})
                 # output
                 inifn=os.path.join(self.proj_root, 'coawst_ini.nc')
-                self.ds_smp.to_netcdf(inifn, engine='netcdf4', format='NETCDF3_64BIT')
+                self.ds_smp.to_netcdf(inifn)
                 utils.write_log(print_prefix+'build initial conditions done!')
             self.build_clm(it, tf)
             self.build_bdy(it, tf)
@@ -327,16 +335,19 @@ class ROMSRocker:
             ds_clm[varname].values=self.ds_smp[varname].values
  
         # deal with time vars 
-        #time_offset=time_frm - const.BASE_TIME
+        time_offset=time_frm - const.BASE_TIME
         for var in const.CLM_TIME_VAR:
             var_time=ds_clm[var+'_time']
             # pkg time
-            var_time.values[:]=idt*self.ocn_nfrq*const.S2NS
+            if self.version=='3.6':
+                var_time.values[:]=int(time_offset.total_seconds())*const.S2NS-const.HALF_DAY_NS
+            else:
+                var_time.values[:]=int(time_offset.total_seconds())*const.S2NS
             #ds_clm=ds_clm.assign_coords({var:var_time})
         
         clmfn=os.path.join(
             self.proj_root,'coawst_clm_%s.nc'% time_frm.strftime('%Y%m%d%H'))
-        ds_clm.to_netcdf(clmfn, engine='netcdf4', format='NETCDF3_64BIT')
+        ds_clm.to_netcdf(clmfn)
         '''
         # add one additional bdy file to cover the end time
         if time_frm==self.frm_time_series[-1]:
@@ -376,13 +387,17 @@ class ROMSRocker:
             ds_bdy[var_bdy].values=self.ds_smp[varname].values[:,:,:,0]
             var_bdy=varname+'_east'
             ds_bdy[var_bdy].values=self.ds_smp[varname].values[:,:,:,-1]
+        time_offset=time_frm - const.BASE_TIME
         # deal with time vars 
         for var in const.BDY_TIME_VAR:
             var_time=ds_bdy[var+'_time']
-            var_time.values[:]=idt*self.ocn_nfrq*const.S2NS
+            if self.version=='3.6':
+                var_time.values[:]=int(time_offset.total_seconds())*const.S2NS-const.HALF_DAY_NS
+            else:
+                var_time.values[:]=int(time_offset.total_seconds())*const.S2NS
             #ds_bdy=ds_bdy.assign_coords({var:var_time})
 
         bdyfn=os.path.join(
             self.proj_root,'coawst_bdy_%s.nc'% time_frm.strftime('%Y%m%d%H'))
-        ds_bdy.to_netcdf(bdyfn, engine='netcdf4', format='NETCDF3_64BIT')
+        ds_bdy.to_netcdf(bdyfn)
  
