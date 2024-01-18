@@ -97,3 +97,12 @@ def find_indices(strt_dp, end_dp, SOI_LVS):
         j = next(x[0] for x in enumerate(SOI_LVS) if x[1] >= end_dp)
         res_e=SOI_LVS[j]-end_dp
     return i, j, res_s, res_e
+
+def find_factor_pairs(nall):
+    if nall==0:
+        return 0,0
+    
+    ibound=int(np.sqrt(nall))
+    for i in range(ibound,1,-1):
+        if nall%i==0:
+            return i,nall//i

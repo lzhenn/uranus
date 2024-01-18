@@ -48,6 +48,7 @@ class Uranus:
         self.rock_flg=cfg.getboolean('rock_cpl')
         self.rock_wrf=self.cfg['WRF'].getboolean('rock_wrf')
         self.rock_roms=self.cfg['ROMS'].getboolean('rock_roms')
+        self.rock_swan=self.cfg['SWAN'].getboolean('rock_swan')
         self.mode=cfg['uranus_mode']
         self.nml_temp=cfg['nml_temp']
         self.sim_strt_time=utils.parse_init_time(cfg['model_init_ts'])
@@ -65,6 +66,12 @@ class Uranus:
         self.mpicmd=self.machine_dic['mpicmd']
         self.cfgdb_root=self.machine_dic['cfgdb_root']
         self.domdb_root=self.machine_dic['domdb_root']
+        
+            
+        self.ntasks_atm, self.ntasks_wav,\
+        self.ntasks_ocn, self.ntasks_iocn,self.ntasks_jocn,\
+        self.ntasks_all=utils.get_ntasks(self.cfg, self.mode) 
+        
         if self.mode=='shu':
             self.cplexe_root=self.cfg['WRF']['wrf_root']
         else:
@@ -76,7 +83,11 @@ class Uranus:
         
         self.proj_root=os.path.join(
             self.cplexe_root,'Projects',self.nml_temp)
+        if not(os.path.exists(self.proj_root)):
+            utils.write_log(print_prefix+'mkdir '+self.proj_root)
+            os.mkdir(self.proj_root)
         
+
         
         self.arch_flag=cfg.getboolean('archive_flag')
         self.arch_root=utils.parse_fmt_timepath(self.sim_strt_time, cfg['arch_root'])
@@ -85,6 +96,7 @@ class Uranus:
     def waterfall(self):
         self.makewrf()
         self.makeroms()
+        self.makeswan()
         self.cplrock()
     
     def makewrf(self):
@@ -97,17 +109,17 @@ class Uranus:
         from.lib import roms_rocker
         if self.rock_roms:
             self.romsmaker=roms_rocker.ROMSRocker(self)
+            self.romsmaker.build_forc() 
             self.romsmaker.build_icbc() 
-    
+    def makeswan(self):
+        from .lib import swan_rocker
+        if self.rock_swan:
+            self.swanmaker=swan_rocker.SWANRocker(self)
+            self.swanmaker.rock()
     def cplrock(self):
         # rock the coupled model!
         if self.rock_flg:
-            cfg,mode=self.cfg, self.mode
-            self.ntasks_atm=int(cfg[mode]['ntasks_atm'])
-            self.ntasks_iocn=int(cfg[mode]['ntasks_iocn'])
-            self.ntasks_jocn=int(cfg[mode]['ntasks_jocn'])
-            self.ntasks_ocn=self.ntasks_iocn*self.ntasks_jocn
-            self.ntasks_all=self.ntasks_atm+self.ntasks_ocn 
+            cfg=self.cfg
             # copy files
             cfgfn=os.path.join(
                 self.cfgdb_root, self.nml_temp, '*in')
@@ -115,21 +127,22 @@ class Uranus:
             domfn=os.path.join(
                 self.domdb_root, self.nml_temp, 'scrip*')
             io.symlink_files(domfn, self.proj_root)
-            
-            wrf_nml=os.path.join(
-                cfg['WRF']['wrf_root'],'namelist.input')
-            io.copy_files(wrf_nml, self.cplexe_root)
-            
-            wrf_drvfn=os.path.join(
-                cfg['WRF']['wrf_root'],'wrf[l,f,i,b]*')
-            io.symlink_files(wrf_drvfn, self.cplexe_root) 
- 
+            if self.ntasks_atm>0: 
+                wrf_nml=os.path.join(
+                    cfg['WRF']['wrf_root'],'namelist.input')
+                io.copy_files(wrf_nml, self.cplexe_root)
+                
+                wrf_drvfn=os.path.join(
+                    cfg['WRF']['wrf_root'],'wrf[l,f,i,b]*')
+                io.symlink_files(wrf_drvfn, self.cplexe_root) 
+    
             # sed cfg files
             cpl_in=os.path.join(self.proj_root, 'coupling.in')
             ocn_name=os.path.join('Projects', self.nml_temp, 'roms_d01.in')
             scrip_name=os.path.join('Projects', self.nml_temp, 'scrip.nc')
             sed_dic={
                 'NnodesATM':self.ntasks_atm, 'NnodesOCN':self.ntasks_ocn,
+                'NnodesWAV':self.ntasks_wav, 
                 'OCN_name':ocn_name, 'SCRIP_COAWST_NAME':scrip_name
             }
             for key, itm in sed_dic.items():
@@ -137,13 +150,13 @@ class Uranus:
             
             # roms flow
             self.romsmaker.prepare_rock()
-        
+            self.swanmaker.prepare_rock()
             # run coawstM
             # special for cmme
             if self.machine_name == 'pird':
                 cmd=f'mpirun -n {self.ntasks_all} ./coawstM'
             else:
-                cmd=utils.build_wrfcmd(
+                cmd=utils.build_execmd(
                     self.machine_name, self.bashrc, self.cplexe_root, 
                     self.mpicmd, self.ntasks_all, 'coawstM')
  
@@ -156,7 +169,7 @@ class Uranus:
                 cwst_sbatch=f'{self.cplexe_root}/coawstM.sh'
                 utils.sedline('#SBATCH -n',f'#SBATCH -n {self.ntasks_all}', cwst_sbatch) 
                 utils.sedline('time mpirun', cmd, cwst_sbatch) 
-                batchcmd=utils.build_wrfcmd(
+                batchcmd=utils.build_execmd(
                 self.machine_name, self.bashrc, self.cplexe_root, 
                     self.mpicmd, self.ntasks_all, 'coawstM')
                 utils.write_log(print_prefix+'Run coawstM: '+batchcmd)

@@ -4,7 +4,7 @@
 import os, glob, shutil
 import numpy as np
 import pandas as pd
-import struct, time
+import struct
 from . import utils, const
 
 # ---Module regime consts and variables---
@@ -32,7 +32,13 @@ def del_files(tgt_path, fnpatterns):
     for filename in file_list:
         if filename.startswith(tuple(fnpatterns)):
             os.remove(os.path.join(tgt_path, filename))
-            
+
+def get_wrf_fn(tgt_time, wrf_domain):
+    '''
+    return aimed wrf file name given tgt_time and wrf_domain
+    '''
+    return 'wrfout_'+wrf_domain+'_'+tgt_time.strftime('%Y-%m-%d_%H:00:00')
+        
 def sel_frm(da_src, tf, itf):
     try:
         da=da_src.sel(time=tf, method='nearest')
@@ -65,7 +71,54 @@ def gen_patternfn_lst(drv_root, drv_dic, inittime,
             utils.throw_error(f'file not exist: {fn_full}')
         fn_lst.append(fn_full)
     return fn_lst, tfs
-# WRF Interim File
+def gen_roms_forc_template(ts, lat2d, lon2d):
+    '''generate the forcing template file for ROMS
+        ts: time series, in days relative to basetime
+        lat2d, lon2d: 2D arrays
+    '''
+    import xarray as xr
+    
+    nt, (nx,ny)=len(ts), lat2d.shape
+    # Create the dimensions
+    xr_dim = xr.IndexVariable('xr', np.arange(nx))
+    er_dim = xr.IndexVariable('er', np.arange(ny))
+    time_dim = xr.IndexVariable('time', ts)
+    coords={'xr': xr_dim, 'er': er_dim, 'time': time_dim}
+
+
+    # Create the variables
+    ds_lon = xr.Variable(('er', 'xr'), np.zeros((ny, nx)), attrs={
+        'long_name': 'longitude', 'units': 'degrees_east', 'field': 'xp, scalar, series'})
+    ds_lat = xr.Variable(('er', 'xr'), np.zeros((ny, nx)), attrs={
+        'long_name': 'latitude', 'units': 'degrees_north', 'field': 'yp, scalar, series'})
+    ocean_time = xr.Variable('time', ts, attrs={
+        'long_name': 'atmospheric forcing time', 'units': 'days', 'field': 'time, scalar, series'})
+
+    var_xarr={}
+    for var in const.FORC_TIMEVAR_LIST:
+        var_xarr[var+'_time']=xr.Variable(var+'_time', ts,
+            attrs={'long_name':var+'_time', 
+                'units':'days since 1858-11-17 00:00:00 UTC',
+                'field':'wind_time, scalar, series'})
+        
+    for key, attr in const.FORC_VAR_DIC.items():
+        timedim=attr['time']
+        var_xarr[key]=xr.Variable((timedim, 'er', 'xr'), np.zeros((nt, ny, nx)), attrs=attr)
+    # Assign Values
+    ds_lon.values=lon2d.values
+    ds_lat.values=lat2d.values
+    var_xarr['ocean_time']=ocean_time
+    var_xarr['lat'],var_xarr['lon']=ds_lat,ds_lon
+
+    # Create the dataset
+    ds = xr.Dataset(var_xarr, coords=coords)
+
+    # Add global attributes
+    ds.attrs['type'] = 'bulk fluxes forcing file'
+    ds.attrs['gridid'] = 'combined grid'
+
+    return ds
+
 def gen_wrf_mid_template(drv_key):
     # init the dictionary
     drv_dic=const.DRV_DIC[drv_key]

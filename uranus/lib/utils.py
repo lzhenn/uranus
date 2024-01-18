@@ -14,16 +14,17 @@
 # ---imports---
 import logging
 import pkg_resources
-from . import const
+from . import const, mathlib
 import shutil
 import datetime
 from tempfile import mkstemp
 
-def build_wrfcmd(mach_name, bashrc, exeroot, mpicmd, ntasks, exename):
+def build_execmd(mach_name, bashrc, exeroot, mpicmd, ntasks, exename):
     mach_dic=const.MACHINE_DIC[mach_name]
     nnodes=max(1,ntasks//mach_dic['corespernode'])
     if 'hqlx' in mach_name:
-        return f'ssh {mach_name} "source {bashrc}; cd {exeroot};{mpicmd} -np {ntasks} ./{exename}"'
+        #return f'ssh {mach_name} "source {bashrc}; cd {exeroot};{mpicmd} -np {ntasks} ./{exename}"'
+        return f'source {bashrc}; cd {exeroot};{mpicmd} -np {ntasks} ./{exename}'
     elif mach_name == 'th2':
         return f'source {bashrc}; cd {exeroot};{mpicmd} -N {nnodes} -n {ntasks} ./{exename}'
     elif mach_name == 'pird':
@@ -55,11 +56,22 @@ def parse_fmt_timepath(tgt_time, fmtpath):
             parsed_path+=seg
     return parsed_path
 
+def get_ntasks(cfg, mode):
+    cfgntask=cfg['NTASKS']
+    act_flgs=const.MODE_FLAG_DIC[mode]
+    natm=int(cfgntask['ntasks_atm'])*act_flgs[0]
+    nocn=int(cfgntask['ntasks_ocn'])*act_flgs[1]
+    nwav=int(cfgntask['ntasks_wav'])*act_flgs[2]
+    nocni,nocnj=mathlib.find_factor_pairs(nocn)
+    nall=natm+nocn+nwav
+    return natm, nwav, nocn, nocni, nocnj, nall
 def sed_wrf_timeline(pattern, ts, source, fmt="'%Y-%m-%d_%H:%M:%S'", dedest=None):
     ts_list=[ts.strftime(fmt)]*4
     temp_str=','.join(ts_list)
     sedline(pattern,f'{pattern} = {temp_str}',source)
-def sedline(pattern, replace, source, dest=None, count=1):
+
+
+def sedline(pattern, replace, source, dest=None, whole_line=True, count=0):
     """Reads a source file and writes the destination file.
 
     In each line, replaces pattern with replace.
@@ -85,6 +97,8 @@ def sedline(pattern, replace, source, dest=None, count=1):
         out = line
         if pattern in line:
             out = ' '+replace+'\n'
+            if not whole_line:
+                out=line.replace(pattern, replace)
         fout.write(out)
 
         if out != line:

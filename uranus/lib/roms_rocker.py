@@ -3,6 +3,7 @@
 import os, datetime
 import pandas as pd
 import xarray as xr
+
 import numpy as np
 from . import utils, io, const, mathlib
 
@@ -22,7 +23,7 @@ class ROMSRocker:
         self.uranus=uranus
         self.cfg=uranus.cfg
         try:
-            self.version=self.cfg['cwst_version']
+            self.version=self.cfg['URANUS']['cwst_version']
         except:
             self.version='3.8'
             utils.write_log(print_prefix+'no version in cfg, use 3.8')
@@ -34,6 +35,10 @@ class ROMSRocker:
         self.dstart=time_offset.total_seconds()/const.DAY_IN_SEC
 
         self.drv_type=romscfg['drv_type']
+        self.gen_surf=romscfg.getboolean('gen_surf')
+        self.surf_type=romscfg['surf_type']
+        self.surf_frq=romscfg['surf_frq']
+        self.surf_root=utils.parse_fmt_timepath(self.strt_time, romscfg['surf_root'])
         self.drv_dic=const.DRV_DIC[self.drv_type+'_roms']
         self.drv_root=utils.parse_fmt_timepath(self.strt_time, romscfg['drv_root'])
         self.proj_root=uranus.proj_root
@@ -41,10 +46,6 @@ class ROMSRocker:
         self.dt=int(romscfg['dt'])
         self.nrst=int(romscfg['nrst'])
         self.nhis=int(romscfg['nhis'])
-        if not(os.path.exists(self.proj_root)):
-            utils.write_log(print_prefix+'mkdir '+self.proj_root)
-            os.mkdir(self.proj_root)
-        
         # build meta
         self.frm_time_series=pd.date_range(
             start=self.strt_time, end=self.end_time, freq=self.drv_dic['ocn_nfrq'])
@@ -68,18 +69,19 @@ class ROMSRocker:
         ndefhis=const.DAY_IN_SEC//self.dt
         
         grdname=os.path.join('Projects', nml_temp, 'roms_d01_omp.nc')
-        ininame=os.path.join('Projects', nml_temp, 'coawst_ini.nc')
+        ininame=os.path.join('Projects', nml_temp, 'roms_d01_ini.nc')
         
         clmname,bryname='',''
         for tf in self.file_time_series: 
             tf_str=tf.strftime('%Y%m%d%H')
-            clmname+=os.path.join('Projects', nml_temp, f'coawst_clm_{tf_str}.nc |\n')
-            bryname+=os.path.join('Projects', nml_temp, f'coawst_bdy_{tf_str}.nc |\n')
+            clmname+=os.path.join('Projects', nml_temp, f'roms_d01_clm_{tf_str}.nc |\n')
+            bryname+=os.path.join('Projects', nml_temp, f'roms_d01_bdy_{tf_str}.nc |\n')
         tf_close=self.file_time_series[-1]+datetime.timedelta(days=1)
         tf_str=tf_close.strftime('%Y%m%d%H')
-        clmname+=os.path.join('Projects', nml_temp, f'coawst_clm_{tf_str}.nc')
-        bryname+=os.path.join('Projects', nml_temp, f'coawst_bdy_{tf_str}.nc')
-    
+        clmname+=os.path.join('Projects', nml_temp, f'roms_d01_clm_{tf_str}.nc')
+        bryname+=os.path.join('Projects', nml_temp, f'roms_d01_bdy_{tf_str}.nc')
+        
+        frcname=os.path.join('Projects', nml_temp, 'roms_forc.nc') 
         
         tf_start=self.file_time_series[0]       
         tf_str=tf_start.strftime('%Y%m%d')
@@ -88,11 +90,12 @@ class ROMSRocker:
             'NTIMES':ntimes, 'DT':f"{self.dt:.1f}d0", 'NRST':nrst, 'NHIS':nhis, 
             'NDEFHIS':ndefhis, 'NDIA':nhis, #'NAVG':nhis, 
             'GRDNAME':grdname, 'ININAME':ininame, 'CLMNAME':clmname, 'BRYNAME':bryname,
+            'FRCNAME':frcname,
             'DSTART':f'{self.dstart:.1f}d0',
             #'TIME_REF':f"{tf_str}.0d0"
         }
         for key, itm in sed_dic.items():
-            utils.sedline(key, f'{key} == {itm}', roms_in)
+            utils.sedline(key, f'{key} == {itm}', roms_in, count=1)
   
     def load_domain(self):
         """ load domain file """
@@ -121,7 +124,58 @@ class ROMSRocker:
             'lat': self.lat1d}) 
         # generate data template
         self.roms_3dtemplate=self.ds_smp['temp']
-  
+    
+    def build_forc(self):
+        """ build forcing for ROMS """
+        if not(self.gen_surf):
+            return
+        utils.write_log(
+            print_prefix+'build forcing from %s to %s...'%(
+                self.strt_time.strftime('%Y%m%d%H'),self.end_time.strftime('%Y%m%d%H')))
+        
+        surf_dir=self.surf_root
+        
+        if not os.path.exists(surf_dir):
+            utils.throw_error(print_prefix+'Surface forcing directory does not exist!')
+        
+        forc_time_series=pd.date_range(
+            start=self.strt_time, end=self.end_time, freq=self.surf_frq)
+        trange=[(it-const.BASE_TIME).total_seconds()/const.DAY_IN_SEC for it in forc_time_series]
+        curr_time=self.strt_time
+        
+        if self.surf_type=='wrf':
+            import netCDF4 as nc4
+            import wrf
+            surf_file=io.get_wrf_fn(curr_time, 'd01')
+            surf_file=os.path.join(surf_dir,surf_file)
+            wrf_hdl=nc4.Dataset(surf_file)
+            XLAT=wrf.getvar(wrf_hdl,'XLAT')
+            XLONG=wrf.getvar(wrf_hdl,'XLONG')
+            ds_forc=io.gen_roms_forc_template(trange, XLAT, XLONG)
+            # iter timeframes 
+            for idx,curr_time in enumerate(forc_time_series):
+                surf_file=io.get_wrf_fn(curr_time, 'd01')
+                utils.write_log(print_prefix+'Read surface forcing from '+surf_file)
+                surf_file=os.path.join(surf_dir,surf_file)
+                for roms_var, wrf_var in const.ROMS_WRF_FORC_MAPS.items():
+                    if roms_var=='Tair':
+                        temp_var = wrf.getvar(
+                            wrf_hdl, wrf_var, 
+                            timeidx=wrf.ALL_TIMES, method="cat")
+                        temp_var=temp_var-const.K2C
+                    elif roms_var=='Pair':
+                        temp_var = wrf.getvar(
+                            wrf_hdl, wrf_var, 
+                            timeidx=wrf.ALL_TIMES, method="cat", units='mb')
+                    else:
+                        temp_var = wrf.getvar(
+                            wrf_hdl, wrf_var,
+                            timeidx=wrf.ALL_TIMES, method="cat")
+                    ds_forc[roms_var].values[idx,:,:]=temp_var.values
+                #break
+        forc_fn=os.path.join(
+            self.proj_root,'roms_forc.nc')
+        ds_forc.to_netcdf(forc_fn)
     def build_icbc(self):
         """ build icbcs for ROMS """
         if not(self.run_maker):
@@ -168,7 +222,7 @@ class ROMSRocker:
                 self.ds_smp['ocean_time'].values[:]=int(self.dstart*const.DAY_IN_SEC)*const.S2NS
                 self.ds_smp=self.ds_smp.assign_coords({'ocean_time':self.ds_smp['ocean_time']})
                 # output
-                inifn=os.path.join(self.proj_root, 'coawst_ini.nc')
+                inifn=os.path.join(self.proj_root, 'roms_d01_ini.nc')
                 self.ds_smp.to_netcdf(inifn)
                 utils.write_log(print_prefix+'build initial conditions done!')
             self.build_clm(it, tf)
@@ -346,7 +400,7 @@ class ROMSRocker:
             #ds_clm=ds_clm.assign_coords({var:var_time})
         
         clmfn=os.path.join(
-            self.proj_root,'coawst_clm_%s.nc'% time_frm.strftime('%Y%m%d%H'))
+            self.proj_root,'roms_d01_clm_%s.nc'% time_frm.strftime('%Y%m%d%H'))
         ds_clm.to_netcdf(clmfn)
         '''
         # add one additional bdy file to cover the end time
@@ -398,6 +452,6 @@ class ROMSRocker:
             #ds_bdy=ds_bdy.assign_coords({var:var_time})
 
         bdyfn=os.path.join(
-            self.proj_root,'coawst_bdy_%s.nc'% time_frm.strftime('%Y%m%d%H'))
+            self.proj_root,'roms_d01_bdy_%s.nc'% time_frm.strftime('%Y%m%d%H'))
         ds_bdy.to_netcdf(bdyfn)
  

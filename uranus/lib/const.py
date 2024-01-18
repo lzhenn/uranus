@@ -3,6 +3,18 @@ import numpy as np
 import datetime
 PKG_NAME = 'uranus'
 
+
+MODE_FLAG_DIC={
+    # 'mode':[atm, ocn, wav]
+    'shu':[1, 0, 0],
+    'neptune':[0, 1, 0],
+    'calypso':[0, 0, 1],
+    'aegir':[1, 1, 0],
+    'poseidon':[0, 1, 1],
+    'aeolus':[1, 0, 1],
+    'njord':[1, 1, 1]
+}    
+
 # WRF
 UNGRIB_CLEAN_LIST=['CFS', 'ERA', 'SST', 'PFILE', 'GFS', 'CPSV3','BCMM']
 METGRID_CLEAN_LIST=['met_em']
@@ -12,9 +24,12 @@ MACHINE_DIC={
         'bashrc':'/home/lzhenn/.bashrc_intel20_amd',
         'mpicmd':'mpirun', 'corespernode':128, 'nodes':1,
         'metgrid_np':16, 'real_np':16, 'wrf_np':32,
+        'njord_root':'/home/lzhenn/array74/Njord_Calypso/COAWST_Njord',
         'aegir_root':'/home/lzhenn/array74/Njord_Calypso/COAWST_Aegir',
+        'poseidon_root':'/home/lzhenn/array74/Njord_Calypso/COAWST_Poseidon',
+        'calypso_root':'/home/lzhenn/array74/Njord_Calypso/COAWST_Calypso',
         'cfgdb_root':'/home/lzhenn/array74/workspace/uranus/uranus/nml_db/',
-        'domdb_root':'/home/lzhenn/array74/workspace/aegir-implement/domaindb/'
+        'domdb_root':'/home/lzhenn/array74/Njord_Calypso/domaindb/'
     },
     'hqlx86':{
         'bashrc':'/home/metctm1/.bashrc_i20_cwst38',
@@ -47,6 +62,7 @@ for itm in ['47','62','65','69','129','130','133','132','111','100']:
     MACHINE_DIC['hqlx'+itm]=MACHINE_DIC['hqlx74']
                 
 DRV_DIC={
+    # WRF
     'cpsv3_wrf':{
         'use_ungrib':False,'atm_nfrq':'6H','atm_file_nfrq':'1D', 'frm_per_file':4,
         'vcoord':'sigmap', 'acoef':'hyam', 'bcoef':'hybm', 'psname':'PS', 
@@ -56,14 +72,7 @@ DRV_DIC={
         'lats':np.linspace(-89.6559642468699, 89.6559642468699, 400), 
         'lons':np.linspace(0.0,359.55,800), 'plv':'PL18',
     },
-    'cpsv3_roms':{
-        'ocn_nfrq':'24H','ocn_file_nfrq':'1D',
-        'ocn_naming_pattern':'ocean_$F%Y_%m_%d$F.nc',
-    },
-    'cfs_roms':{'ocn_naming_pattern':'ocnf$F%Y%m%d%H$F.01.$I%Y%m%d%H$I.grb2'},
-    'hycom_roms':{'ocn_naming_pattern':'hycome_$F%Y%m%d%H$F.nc',},
-    
-     'bcmm_wrf':{
+    'bcmm_wrf':{
         'use_ungrib':False,'atm_nfrq':'6H','atm_file_nfrq':'MS', 'frm_per_file':-1,
         'vcoord':'p',  
         'lnd_file_nfrq':'MS', 'soillv':'bcmm', 'soil_dim_name':'depth',
@@ -72,6 +81,18 @@ DRV_DIC={
         'lats':np.linspace(-90, 90, 145), 
         'lons':np.linspace(0.0,358.75,288), 'plv':'PL18',
     },
+    # ROMS
+    'cpsv3_roms':{
+        'ocn_nfrq':'24H','ocn_file_nfrq':'1D',
+        'ocn_naming_pattern':'ocean_$F%Y_%m_%d$F.nc',
+    },
+    'cfs_roms':{'ocn_naming_pattern':'ocnf$F%Y%m%d%H$F.01.$I%Y%m%d%H$I.grb2'},
+    'hycom_roms':{
+        'ocn_nfrq':'24H','ocn_file_nfrq':'1D',
+        'ocn_naming_pattern':'hycom_$F%Y%m%d%H$F.nc'},
+    # SWAN
+    'era5_swan':{'wav_naming_pattern':'$F%Y%m%d$F-wv.grib', 'wav_nfrq':'3H', 'wav_file_nfrq':'1D','frm_per_file':8}, 
+    'gfs_swan':{'wav_naming_pattern':'gfswave.t$F%H$Fz.global.0p16.f000.grib2'}    
 }
 
 # Lower bottom level 
@@ -113,7 +134,67 @@ ROMS_VAR=['zeta','temp','salt','u','v','ubar','vbar']
 CLM_TIME_VAR=['v2d','v3d','temp','salt', 'zeta', 'ocean']
 BDY_TIME_VAR=['v2d','v3d','temp','salt', 'zeta']
 
-
+ROMS_WRF_FORC_MAPS={
+    'Uwind': 'U10', 'Vwind': 'V10', 
+    'Pair': 'slp', 'Tair': 'T2',  
+    'Qair': 'rh2', #'rain': '', 
+    'swrad': 'GSW', 'lwrad': 'LWDNB', 'lwrad_down': 'GLW'
+}
+FORC_TIMEVAR_LIST=['wind','pair','tair','qair','rain','srf','lrf']
+FORC_VAR_DIC={'Uwind':{'long_name': 'surface u-wind component', 
+                  'units': 'meter second-1', 
+                  'field': 'Uwind, scalar, series', 
+                  'coordinates': 'lon lat', 
+                  'time': 'wind_time'},
+        'Vwind':{'long_name': 'surface v-wind component',
+                'units': 'meter second-1',
+                'field': 'Vwind, scalar, series',
+                'coordinates': 'lon lat',
+                'time': 'wind_time'},
+        'Pair':{'long_name': 'surface air pressure',
+                'units': 'millibar',
+                'field': 'Pair, scalar, series',
+                'coordinates': 'lon lat',
+                'time': 'pair_time'},
+        'Tair':{'long_name': 'surface air temperature',
+                'units': 'celsius',
+                'field': 'Tair, scalar, series',
+                'coordinates': 'lon lat',
+                'time': 'tair_time'},
+        'Qair':{'long_name': 'surface relative humidity',
+                'units': 'percentage',
+                'field': 'Qair, scalar, series',
+                'coordinates': 'lon lat',
+                'time': 'qair_time'},
+        'rain':{'long_name': 'rain fall rate',
+                'units':'kilogram meter-2 second-1',
+                'field': 'Rain, scalar, series',
+                'coordinates': 'lon lat',
+                'time': 'rain_time'},
+        'swrad':{'long_name': 'net solar shortwave radiation', 
+                'units': 'Watts meter-2', 
+                'positive_value': 'downward flux, heating', 
+                'negative_value': 'upward flux, cooling', 
+                'field': 'swrad, scalar, series', 
+                'coordinates': 'lon lat', 
+                'time': 'srf_time'},
+        'lwrad':{'long_name': 'net downward longwave radiation',
+                'units': 'Watts meter-2', 
+                'positive_value': 'downward flux, heating', 
+                'negative_value': 'upward flux, cooling', 
+                'field': 'lwrad, scalar, series', 
+                'coordinates': 'lon lat', 
+                'time': 'lrf_time'},
+        'lwrad_down':{'long_name': 'downward solar longwave radiation', 
+                'units': 'Watts meter-2', 
+                'positive_value': 'downward flux, heating', 
+                'negative_value': 'upward flux, cooling', 
+                'field': 'lwrad_down, scalar, series', 
+                'coordinates': 'lon lat', 'time': 'lrf_time'}
+} 
+# -----------------------SWAN--------------------------
+SWAN_CLEAN_LIST=['swan_bdy','Errfile','PRINT','swan_d01.hot','lwavp_',
+                'dir_','hsig_','hswell_','swan_','tps_','per_','wind_']
 
 # Physics
 RHO_WATER=1000.0

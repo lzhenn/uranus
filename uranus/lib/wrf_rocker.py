@@ -122,7 +122,7 @@ class WRFRocker:
         bashrc=mach_meta['bashrc']
         mpicmd=mach_meta['mpicmd']
         metgrid_np=mach_meta['metgrid_np']
-        cmd=utils.build_wrfcmd(
+        cmd=utils.build_execmd(
             self.mach_name, bashrc, self.wps_root, mpicmd, metgrid_np, 'metgrid.exe')
         utils.write_log(print_prefix+'Run metgrid.exe: '+cmd)
         rcode=subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
@@ -146,7 +146,7 @@ class WRFRocker:
         mpicmd=mach_meta['mpicmd']
         real_np=mach_meta['real_np']
         io.symlink_files(os.path.join(self.wps_root,'met_em.d*'), self.wrf_root)
-        cmd=utils.build_wrfcmd(
+        cmd=utils.build_execmd(
             self.mach_name, bashrc, self.wrf_root, mpicmd, real_np, 'real.exe')
         utils.write_log(print_prefix+'Run real.exe: '+cmd)
         rcode=subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
@@ -169,7 +169,7 @@ class WRFRocker:
         bashrc=mach_meta['bashrc']
         mpicmd=mach_meta['mpicmd']
         wrf_np=self.ntasks_wrf
-        cmd=utils.build_wrfcmd(
+        cmd=utils.build_execmd(
             self.mach_name, bashrc, self.wrf_root, mpicmd, wrf_np, 'wrf.exe')
         utils.write_log(print_prefix+'Run wrf.exe: '+cmd)
         subprocess.run(cmd, shell=True)
