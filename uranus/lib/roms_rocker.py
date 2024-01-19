@@ -66,7 +66,7 @@ class ROMSRocker:
         nrst=self.nrst*const.DAY_IN_SEC//self.dt
         nhis=self.nhis*const.HR_IN_SEC//self.dt 
         # only use half day
-        ndefhis=const.DAY_IN_SEC//self.dt
+        ndefhis=const.DAY_IN_SEC//self.dt//24
         
         grdname=os.path.join('Projects', nml_temp, 'roms_d01_omp.nc')
         ininame=os.path.join('Projects', nml_temp, 'roms_d01_ini.nc')
@@ -152,11 +152,13 @@ class ROMSRocker:
             XLAT=wrf.getvar(wrf_hdl,'XLAT')
             XLONG=wrf.getvar(wrf_hdl,'XLONG')
             ds_forc=io.gen_roms_forc_template(trange, XLAT, XLONG)
+            wrf_hdl.close()
             # iter timeframes 
             for idx,curr_time in enumerate(forc_time_series):
                 surf_file=io.get_wrf_fn(curr_time, 'd01')
                 utils.write_log(print_prefix+'Read surface forcing from '+surf_file)
                 surf_file=os.path.join(surf_dir,surf_file)
+                wrf_hdl=nc4.Dataset(surf_file)
                 for roms_var, wrf_var in const.ROMS_WRF_FORC_MAPS.items():
                     if roms_var=='Tair':
                         temp_var = wrf.getvar(
@@ -172,7 +174,7 @@ class ROMSRocker:
                             wrf_hdl, wrf_var,
                             timeidx=wrf.ALL_TIMES, method="cat")
                     ds_forc[roms_var].values[idx,:,:]=temp_var.values
-                #break
+                wrf_hdl.close()
         forc_fn=os.path.join(
             self.proj_root,'roms_forc.nc')
         ds_forc.to_netcdf(forc_fn)
@@ -393,8 +395,8 @@ class ROMSRocker:
         for var in const.CLM_TIME_VAR:
             var_time=ds_clm[var+'_time']
             # pkg time
-            if self.version=='3.6':
-                var_time.values[:]=int(time_offset.total_seconds())*const.S2NS-const.HALF_DAY_NS
+            if self.version=='3.5':
+                var_time.values[:]=int(time_offset.total_seconds()-1)*const.S2NS
             else:
                 var_time.values[:]=int(time_offset.total_seconds())*const.S2NS
             #ds_clm=ds_clm.assign_coords({var:var_time})
@@ -445,8 +447,8 @@ class ROMSRocker:
         # deal with time vars 
         for var in const.BDY_TIME_VAR:
             var_time=ds_bdy[var+'_time']
-            if self.version=='3.6':
-                var_time.values[:]=int(time_offset.total_seconds())*const.S2NS-const.HALF_DAY_NS
+            if self.version=='3.5':
+                var_time.values[:]=int(time_offset.total_seconds()-1)*const.S2NS
             else:
                 var_time.values[:]=int(time_offset.total_seconds())*const.S2NS
             #ds_bdy=ds_bdy.assign_coords({var:var_time})

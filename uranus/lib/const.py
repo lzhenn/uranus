@@ -137,9 +137,8 @@ BDY_TIME_VAR=['v2d','v3d','temp','salt', 'zeta']
 ROMS_WRF_FORC_MAPS={
     'Uwind': 'U10', 'Vwind': 'V10', 
     'Pair': 'slp', 'Tair': 'T2',  
-    'Qair': 'rh2', #'rain': '', 
-    'swrad': 'GSW', 'lwrad': 'LWDNB', 'lwrad_down': 'GLW'
-}
+    'Qair': 'rh2', 
+    'swrad': 'GSW', 'lwrad': 'LWDNB', 'lwrad_down': 'GLW'}
 FORC_TIMEVAR_LIST=['wind','pair','tair','qair','rain','srf','lrf']
 FORC_VAR_DIC={'Uwind':{'long_name': 'surface u-wind component', 
                   'units': 'meter second-1', 
