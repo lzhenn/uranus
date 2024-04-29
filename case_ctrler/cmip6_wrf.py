@@ -27,6 +27,9 @@ print(args)
 
 config['URANUS']['machine_name']=f'hqlx{args.mach}'
 config['URANUS']['model_init_ts']=f'{args.year}010100'
+if int(args.year) > 2030:
+    config['URANUS']['nml_temp']='path_2050_lantau'
+    
 config['URANUS']['model_run_days']=f'{args.day}'
 if args.parallel=='1':
     config['WRF']['wps_root']=f'/home/lzhenn/array{args.mach}/WPS-4.3/'

@@ -15,7 +15,7 @@ import logging, logging.config
 import shutil
 import datetime
 import time
-from .lib import cfgparser, utils, const, io
+from .lib import cfgparser, utils, const, io, crawler
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -40,6 +40,10 @@ class Uranus:
                 utils.write_log('config file not exist, copy from pkg...')
                 copy_cfg(os.path.join(CWD,cfgfn))
             self.cfg=cfgparser.read_cfg(os.path.join(CWD,cfgfn))
+        elif cfg=='rewrite':
+            utils.write_log('forced rewrite config file, copy from pkg...')
+            copy_cfg(os.path.join(CWD,cfgfn))
+            self.cfg=cfgparser.read_cfg(os.path.join(CWD,cfgfn))
         else:
             utils.write_log('use passed config...')
             self.cfg=cfg
@@ -51,17 +55,15 @@ class Uranus:
         self.rock_swan=self.cfg['SWAN'].getboolean('rock_swan')
         self.mode=cfg['uranus_mode']
         self.nml_temp=cfg['nml_temp']
+        self.domain_lv=cfg['domain_lv']
         self.sim_strt_time=utils.parse_init_time(cfg['model_init_ts'])
-        self.run_days=int(cfg['model_run_days'])
-        self.sim_end_time=self.sim_strt_time+datetime.timedelta(days=self.run_days)
+        self.run_hours=utils.parse_runspan(cfg['model_run_span'])
+        self.sim_end_time=self.sim_strt_time+datetime.timedelta(hours=self.run_hours)
 
 
         self.machine_name=cfg['machine_name']
         self.machine_dic=const.MACHINE_DIC[self.machine_name]
-        try:
-            self.machine_dic[f'{self.mode}_root']=cfg['cwst_path']
-        except KeyError:
-            pass
+        self.update_machine_dic()
         self.bashrc=self.machine_dic['bashrc']
         self.mpicmd=self.machine_dic['mpicmd']
         self.cfgdb_root=self.machine_dic['cfgdb_root']
@@ -83,16 +85,29 @@ class Uranus:
         
         self.proj_root=os.path.join(
             self.cplexe_root,'Projects',self.nml_temp)
-        if not(os.path.exists(self.proj_root)):
-            utils.write_log(print_prefix+'mkdir '+self.proj_root)
-            os.mkdir(self.proj_root)
+        io.check_mkdir(self.proj_root)
         
-
+        if (
+            self.cfg['WRF'].getboolean('down_drv_data') or\
+            self.cfg['ROMS'].getboolean('down_drv_data') or\
+            self.cfg['SWAN'].getboolean('down_drv_data')):
+            self.crawler=crawler.Crawler(self)
         
         self.arch_flag=cfg.getboolean('archive_flag')
         self.arch_root=utils.parse_fmt_timepath(self.sim_strt_time, cfg['arch_root'])
         utils.write_log('Uranus Initiation Done.')
-
+    def update_machine_dic(self):
+        try:
+            spec=const.NML_SPECIFIC[self.nml_temp]
+            for k, v in spec.items():
+                self.machine_dic[k]=v
+        except KeyError:
+            pass
+        try:
+            self.machine_dic[f'{self.mode}_root']=self.cfg['cwst_path']
+        except KeyError:
+            pass
+ 
     def waterfall(self):
         self.makewrf()
         self.makeroms()
@@ -109,8 +124,7 @@ class Uranus:
         from.lib import roms_rocker
         if self.rock_roms:
             self.romsmaker=roms_rocker.ROMSRocker(self)
-            self.romsmaker.build_forc() 
-            self.romsmaker.build_icbc() 
+            
     def makeswan(self):
         from .lib import swan_rocker
         if self.rock_swan:
@@ -120,6 +134,7 @@ class Uranus:
         # rock the coupled model!
         if self.rock_flg:
             cfg=self.cfg
+            domlv=self.domain_lv
             # copy files
             cfgfn=os.path.join(
                 self.cfgdb_root, self.nml_temp, '*in')
@@ -138,19 +153,20 @@ class Uranus:
     
             # sed cfg files
             cpl_in=os.path.join(self.proj_root, 'coupling.in')
-            ocn_name=os.path.join('Projects', self.nml_temp, 'roms_d01.in')
-            scrip_name=os.path.join('Projects', self.nml_temp, 'scrip.nc')
+            ocn_name=os.path.join('Projects', self.nml_temp, f'roms_{domlv}.in')
+            wav_name=os.path.join('Projects', self.nml_temp, f'swan_{domlv}.in')
+            scrip_name=os.path.join('Projects', self.nml_temp, f'scrip.{domlv}.nc')
             sed_dic={
-                'NnodesATM':self.ntasks_atm, 'NnodesOCN':self.ntasks_ocn,
-                'NnodesWAV':self.ntasks_wav, 
-                'OCN_name':ocn_name, 'SCRIP_COAWST_NAME':scrip_name
+                'NnodesATM':self.ntasks_atm, 'NnodesOCN':self.ntasks_ocn, 'NnodesWAV':self.ntasks_wav, 
+                'WAV_name':wav_name,'OCN_name':ocn_name, 
+                'SCRIP_COAWST_NAME':scrip_name
             }
             for key, itm in sed_dic.items():
-                utils.sedline(key, f'{key} = {itm}', cpl_in)
+                utils.sedline(key, f'{key} = {itm}', cpl_in, count=1)
             
             # roms flow
-            self.romsmaker.prepare_rock()
-            self.swanmaker.prepare_rock()
+            self.romsmaker.prepare_cplrock()
+            self.swanmaker.prepare_cplrock()
             # run coawstM
             # special for cmme
             if self.machine_name == 'pird':
@@ -163,7 +179,7 @@ class Uranus:
             relative_cpl_in=os.path.join(
                 '.','Projects',self.nml_temp,'coupling.in')
             cmd+=f' {relative_cpl_in}'
-            cmd+=f' >& {self.cplexe_root}/coawstM.log' 
+            cmd+=f' >& {self.cplexe_root}/coawstM.{datetime.datetime.now().strftime("%y%m%d%H%M%S")}.log' 
             
             if self.machine_name == 'pird':
                 cwst_sbatch=f'{self.cplexe_root}/coawstM.sh'
@@ -193,10 +209,8 @@ class Uranus:
             self.archive_data()
     
     def archive_data(self):
-        if not(os.path.exists(self.arch_root)):
-            utils.write_log(print_prefix+'mkdir '+self.arch_root)
-            os.makedirs(self.arch_root)
-        file_patterns=['wrf[o,r,x]*','*nc']
+        io.check_mkdir(self.arch_root)
+        file_patterns=['wrf[o,r,x]*','roms_his*','swan_his*']
         for itm in file_patterns:
             cmd=f'mv {os.path.join(self.cplexe_root,itm)} {self.arch_root}'
             utils.write_log(print_prefix+'Archive: '+cmd)

@@ -70,7 +70,6 @@
 !           weights. This file is created using the code in
 !           Lib/SCRIP_COAWST/scrip_coawst[.exe]
 
-!  SCRIP_COAWST_NAME = Projects/Sandy/scrip_sandy_moving.nc
    SCRIP_COAWST_NAME = Projects/njord/roms_swan_grid/scrip_njord.nc
 !  SCRIP_COAWST_NAME = Projects/Sandy/WW3/scrip_sandy_nowavenest.nc
 

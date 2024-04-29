@@ -972,7 +972,6 @@ Dout(iTvdif) == F F     ! temp_vdiff, ...    vertical diffusion
 
      GRDNAME == Projects/poseidon_1500m_L12/roms_d01_omp.nc 
 !                Projects/Njord/roms_swan_grid/roms_d02_lp0.08.nc
-!     ININAME == Projects/njord/spinup_restart/gba_ocean_rst_d01.nc 
      ININAME == Projects/poseidon_1500m_L12/roms_d01_ini.nc 
 !                Projects/Njord/ow_icbc/d02/coawst_ini_d02.nc
      ITLNAME == ocean_itl.nc

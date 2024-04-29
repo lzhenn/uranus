@@ -43,6 +43,14 @@ def parse_init_time(tstr):
             today = today.replace(hour=0,minute=0,second=0,microsecond=0)
             ts=today - datetime.timedelta(days=num_days)
     return ts
+def parse_runspan(tstr):
+    if tstr.endswith('D'):
+        run_hours=int(tstr[:-1])*24
+    elif tstr.endswith('H'):
+        run_hours=int(tstr[:-1])
+    else:
+        run_hours=int(tstr)*24
+    return run_hours
 def parse_fmt_timepath(tgt_time, fmtpath):
     '''
     parse time string to datetime object

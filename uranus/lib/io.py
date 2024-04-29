@@ -1,14 +1,31 @@
 #!/usr/bin/env python3
 """specific module for IO"""
 # ---imports---
-import os, glob, shutil
+import os, glob, shutil, subprocess, time
 import numpy as np
 import pandas as pd
-import struct
+import struct, datetime
 from . import utils, const
 
 # ---Module regime consts and variables---
 print_prefix='lib.io>>'
+
+def hpc_quechck(chck_cmd, jobid):
+    timer=30
+    rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
+    stdout=rcode.stdout.decode()
+    while jobid in stdout:
+        utils.write_log(f'{print_prefix}({timer}s check) On: {stdout}')
+        time.sleep(timer)
+        rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
+        stdout=rcode.stdout.decode()
+
+    
+
+def check_mkdir(tgt_path):
+    if not os.path.exists(tgt_path):
+        utils.write_log(f'{print_prefix}Make directory {tgt_path}...')
+        os.makedirs(tgt_path)
 
 def copy_files(src_path, dest_path):
     utils.write_log(
@@ -46,6 +63,28 @@ def sel_frm(da_src, tf, itf):
         da=da_src.isel(time=itf)
     return da
 
+def gen_roms_his_fnlst(drv_root, drv_dic, domid, tfs,ocn_nfrq):
+    import xarray as xr
+    fn_lst=[]
+    pattern=drv_dic[f'ocn_naming_pattern']
+    # get offset, if any
+    trange=[(it-const.BASE_TIME).total_seconds()/const.DAY_IN_SEC for it in tfs]
+    fn0=pattern.replace('domid', domid) % 1
+    fn0=os.path.join(drv_root, fn0)
+    ds0=xr.open_dataset(fn0)
+    tfs0=trange[0]*const.DAY_IN_SEC
+    # convert to datetime
+    dt_dt = datetime.datetime.utcfromtimestamp(
+        ds0.ocean_time.values[0].astype('O') / 1e9)
+    t0=(dt_dt-const.BASE_TIME).total_seconds()
+    offset=(tfs0-t0)/ocn_nfrq
+    
+    for idt, tf in enumerate(tfs):
+        idtr=int(idt+offset)
+        fn=pattern.replace('domid', domid) % (idtr+1)
+        fn=os.path.join(drv_root, fn)
+        fn_lst.append(fn)
+    return fn_lst, tfs
 def gen_patternfn_lst(drv_root, drv_dic, inittime, 
         endtime, kw='atm',special=''):
     
@@ -78,7 +117,7 @@ def gen_roms_forc_template(ts, lat2d, lon2d):
     '''
     import xarray as xr
     
-    nt, (nx,ny)=len(ts), lat2d.shape
+    nt, (ny,nx)=len(ts), lat2d.shape
     # Create the dimensions
     xr_dim = xr.IndexVariable('xr', np.arange(nx))
     er_dim = xr.IndexVariable('er', np.arange(ny))

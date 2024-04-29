@@ -1,6 +1,6 @@
 #/bin/sh 
 
-NODE_LST=("hqlx47" "hqlx100" "hqlx111" "hqlx133" "hqlx132" "hqlx62" "hqlx65" "hqlx69" "hqlx129" "hqlx130")
+NODE_LST=("hqlx174" "hqlx179" "hqlx47" "hqlx100" "hqlx111" "hqlx133" "hqlx132" "hqlx62" "hqlx65" "hqlx69" "hqlx129" "hqlx130")
 QUE_LST=("P1" "P2")
 for NODE in ${NODE_LST[@]}
 do

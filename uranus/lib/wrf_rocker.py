@@ -19,7 +19,6 @@ class WRFRocker:
         self.cfg=uranus.cfg
         self.mach_name=self.cfg['URANUS']['machine_name']
         wrfcfg=self.cfg['WRF']
-        self.run_maker=wrfcfg.getboolean('rock_wrf')
         self.rewrite_geog=wrfcfg.getboolean('rewrite_geo_em')
         self.rewrite_namelist=wrfcfg.getboolean('rewrite_namelist')
         self.drv_type=wrfcfg['drv_type']
@@ -28,32 +27,35 @@ class WRFRocker:
         self.run_metgrid=wrfcfg.getboolean('run_metgrid')
         self.run_real=wrfcfg.getboolean('run_real')
         self.run_wrf=wrfcfg.getboolean('run_wrf')
-        self.drv_root=utils.valid_path(utils.parse_fmt_timepath(self.uranus.sim_strt_time, wrfcfg['drv_root']))
+        self.drv_root=utils.valid_path(
+            utils.parse_fmt_timepath(self.uranus.sim_strt_time, wrfcfg['drv_root']))
+        self.down_drv=wrfcfg.getboolean('down_drv_data')
         self.wps_root, self.wrf_root=utils.valid_path(wrfcfg['wps_root']), utils.valid_path(wrfcfg['wrf_root'])
-        self.ntasks_wrf=wrfcfg.getint('ntasks_wrf')
-        self.mach_meta=self.uranus.machine_dic
+        self.ntasks_wrf=uranus.ntasks_atm
+        self.mach_meta=uranus.machine_dic
         # read drv meta
         resource_path = os.path.join('db', self.drv_type+'.csv')
-        self.df_meta=pd.read_csv(utils.fetch_pkgdata(resource_path))
+        if not(self.drv_dic['use_ungrib']):
+            self.df_meta=pd.read_csv(utils.fetch_pkgdata(resource_path))
  
         
         utils.write_log(f'{print_prefix}WRFMaker Initiation Done.')
     def rock(self):
-        if self.run_maker:
-            self.preprocess()
-            if self.run_ungrib:
-                self.ungrib()
-            if self.run_metgrid:
-                self.metgrid()
-            if self.run_real:
-                self.real()
-            if self.run_wrf:
-                self.wrf()
-        else:
-            utils.write_log(f'{print_prefix}run_maker is False, No need to make wps')
-            return
+        self.preprocess()
+        if self.run_ungrib:
+            self.ungrib()
+        if self.run_metgrid:
+            self.metgrid()
+        if self.run_real:
+            self.real()
+        if self.run_wrf:
+            self.wrf()
     def preprocess(self):
+        
         self.clean_workspace()
+        # down driven data 
+        self.downdrv()
+        
         if self.rewrite_geog:
             domfn=os.path.join(
                 self.uranus.domdb_root, self.uranus.nml_temp, 'geo_em*')
@@ -80,8 +82,11 @@ class WRFRocker:
             nml_dest=os.path.join(self.wrf_root, 'namelist.input')
             shutil.copy(nml_src, nml_dest)
             start_time,end_time=self.uranus.sim_strt_time,self.uranus.sim_end_time
-            sim_hrs=self.uranus.run_days*24
-            nsoil = (self.df_meta['aim_v'].str.startswith('SM')).sum()
+            sim_hrs=self.uranus.run_hours
+            if self.drv_dic['use_ungrib']:
+                nsoil=self.drv_dic['nsoil']
+            else:
+                nsoil = (self.df_meta['aim_v'].str.startswith('SM')).sum()
             nplv=int(self.drv_dic['plv'][2:])+1
             sed_dic={
                 'run_hours':sim_hrs, 'interval_seconds':interval,
@@ -108,13 +113,32 @@ class WRFRocker:
         if self.run_real:
             io.del_files(self.wrf_root, const.WRF_CLEAN_LIST)
             
-    
+    def downdrv(self):
+        if self.down_drv:
+            self.uranus.crawler.down_atm()
+            
     def ungrib(self):
         drv_dic=self.drv_dic
         if drv_dic['use_ungrib']:
-            pass
+            nml_dest=os.path.join(self.wps_root, 'namelist.wps')
+            utils.write_log(
+                f'{self.drv_type} use ungrib.exe to generate wrf interim files')
+            # link Vtable
+            io.symlink_files(
+                os.path.join(
+                    self.wps_root,'ungrib','Variable_Tables',drv_dic['Vtable']), 
+                os.path.join(self.wps_root,'Vtable'))
+            for fp,prefix in zip(drv_dic['file_patterns'],drv_dic['ungrib_prefixes']):
+                # ./link_grib.csh
+                drv_files=os.path.join(self.drv_root,fp)
+                cmd=f'cd {self.wps_root}; ./link_grib.csh {drv_files};'
+                cmd=f'{cmd}source {self.mach_meta["bashrc"]};./ungrib.exe'
+                utils.sedline('prefix',f'prefix = {prefix}',nml_dest) 
+                utils.write_log(print_prefix+'Run ungrib.exe: '+cmd)
+                rcode=subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
         else:
-            utils.write_log(f'{self.drv_type} use struct BYTEFLOW toolkit to generate wrf interim files')
+            utils.write_log(
+                f'{self.drv_type} use struct BYTEFLOW toolkit to generate wrf interim files')
             self._build_meta()
             self._gen_interim()
     def metgrid(self):
@@ -122,24 +146,18 @@ class WRFRocker:
         bashrc=mach_meta['bashrc']
         mpicmd=mach_meta['mpicmd']
         metgrid_np=mach_meta['metgrid_np']
+        nml_dest=os.path.join(self.wps_root, 'namelist.wps')
+        utils.sedline('fg_name',f'fg_name = {self.drv_dic["fg_name"]}',nml_dest)
         cmd=utils.build_execmd(
             self.mach_name, bashrc, self.wps_root, mpicmd, metgrid_np, 'metgrid.exe')
         utils.write_log(print_prefix+'Run metgrid.exe: '+cmd)
         rcode=subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
-        jobid=rcode.stdout.decode().split()[3]
         
         # special for pird
-        
-        chck_cmd='squeue | grep cmme'
-        rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
-        stdout=rcode.stdout.decode()
-        timer=30
-        while jobid in stdout:
-            utils.write_log(f'{print_prefix}({timer}s check) On: {stdout}')
-            time.sleep(timer)
-            rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
-            stdout=rcode.stdout.decode()
-    
+        if self.mach_name in ['pird']:        
+            jobid=rcode.stdout.decode().split()[3]
+            chck_cmd=mach_meta['chck_cmd']
+            io.hpc_quechck(chck_cmd, jobid)       
     def real(self):
         mach_meta=self.mach_meta
         bashrc=mach_meta['bashrc']
@@ -150,20 +168,11 @@ class WRFRocker:
             self.mach_name, bashrc, self.wrf_root, mpicmd, real_np, 'real.exe')
         utils.write_log(print_prefix+'Run real.exe: '+cmd)
         rcode=subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
-        jobid=rcode.stdout.decode().split()[3]
-        
-        # special for pird
-        
-        chck_cmd='squeue | grep cmme'
-        rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
-        stdout=rcode.stdout.decode()
-        timer=30
-        while jobid in stdout:
-            utils.write_log(f'{print_prefix}({timer}s check) On: {stdout}')
-            time.sleep(timer)
-            rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
-            stdout=rcode.stdout.decode()
-    
+        if self.mach_name in ['pird']:        
+            jobid=rcode.stdout.decode().split()[3]
+            chck_cmd=mach_meta['chck_cmd']
+            io.hpc_quechck(chck_cmd, jobid)
+           
     def wrf(self):
         mach_meta=self.mach_meta
         bashrc=mach_meta['bashrc']
@@ -336,7 +345,8 @@ class WRFRocker:
                 out_dic['SLAB']=self.outfrm[aim_v].values
             io.write_record(wrf_mid, out_dic)
         wrf_mid.close()        
-            
+
+         
 def accum_soil_moist(da, aim_v, model_name, lvname):
     strt_dp, end_dp=utils.decode_depth(aim_v)
     SOI_LVS=const.SOILLV_DIC[model_name]

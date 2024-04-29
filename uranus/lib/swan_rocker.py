@@ -29,7 +29,9 @@ class SWANRocker:
         # central controller
         self.rock_swan=swancfg.getboolean('rock_swan')
         self.run_swan=swancfg.getboolean('run_swan')
+        self.restart_run=swancfg.getboolean('restart_run')
         self.swan_root=uranus.cplexe_root
+        self.domid=uranus.domain_lv
         self.run_maker=swancfg.getboolean('gen_swan_icbc')
         self.strt_time,self.end_time=uranus.sim_strt_time,uranus.sim_end_time
         self.seglen=float(swancfg['seg_len'])
@@ -130,14 +132,14 @@ class SWANRocker:
 
 
 
-    def prepare_rock(self):
+    def prepare_cplrock(self):
         domfn=os.path.join(
                 self.uranus.domdb_root, self.uranus.nml_temp, 'swan*')
         io.copy_files(domfn, self.proj_root)
         
         nml_src=os.path.join(
-                self.uranus.cfgdb_root, self.uranus.nml_temp, 'swan_d01.in')
-        nml_dest=os.path.join(self.proj_root, 'swan_d01.in')
+                self.uranus.cfgdb_root, self.uranus.nml_temp,f'swan_{self.domid}.in')
+        nml_dest=os.path.join(self.proj_root, f'swan_{self.domid}.in')
         shutil.copy(nml_src, nml_dest)
         
         utils.sedline(
@@ -146,7 +148,9 @@ class SWANRocker:
         utils.sedline(
             'eeyyyymmdd.hh',self.end_time.strftime('%Y%m%d.%H'),
             nml_dest,whole_line=False)
-        
+        if self.restart_run:
+            utils.sedline(
+                '&INITIAL','INITIAL',nml_dest,whole_line=False)
     def clean_workspace(self):
         io.del_files(self.swan_root, const.SWAN_CLEAN_LIST)
             
@@ -269,82 +273,76 @@ class SWANRocker:
         """ interpolate wind from WRFOUT to SWAN """
         utils.write_log(print_prefix+'Interpolate wind for SWAN...')
         cfg=self.cfg 
-        # active domains
-        ndom=1
         # WRF Parameters
         wrf_dir=self.wrf_dir
         if not os.path.exists(wrf_dir):
             utils.throw_error('WRF output directory does not exist!')
         
-        dom_match=cfgparser.get_varlist(cfg['SWAN']['swan_wrf_match'])
+        wrf_domain=cfg['SWAN']['wrf_match']
         wind_prefix=cfg['SWAN']['wind_prefix']
         domdb_path=os.path.join(self.uranus.domdb_root, self.uranus.nml_temp) 
-        for idom in range(ndom):
-            # SWAN domain file
-            dom_id, wrf_domain=dom_match[idom].split(':')
-            dom_file=os.path.join(domdb_path,f'roms_{dom_id}_omp.nc')
-            if not(os.path.exists(dom_file)):
-                dom_file=os.path.join(domdb_path,f'swan_{dom_id}.nc')
-            ds_swan=xr.load_dataset(dom_file)
+        # SWAN domain file
+        dom_file=os.path.join(domdb_path,f'roms_{self.domid}_omp.nc')
+        if not(os.path.exists(dom_file)):
+            dom_file=os.path.join(domdb_path,f'swan_{self.domid}.nc')
+        ds_swan=xr.load_dataset(dom_file)
 
-            lat_swan=ds_swan['lat_rho']
-            lon_swan=ds_swan['lon_rho']
-           
-            force_fn=wind_prefix+'_'+dom_id+'.dat'
-            force_fn=self.proj_root+'/'+force_fn
+        lat_swan=ds_swan['lat_rho']
+        lon_swan=ds_swan['lon_rho']
+        
+        force_fn=wind_prefix+'_'+self.domid+'.dat'
+        force_fn=self.proj_root+'/'+force_fn
+        
+        # IF force file exists
+        if os.path.exists(force_fn):
+            utils.write_log(print_prefix+'Delete existing wind file...%s' % force_fn, 30)
+            os.remove(force_fn)
+        
+        curr_time=self.strt_time
+
+        # iter timeframes 
+        while curr_time < self.end_time:
+            wrf_file=io.get_wrf_fn(curr_time, wrf_domain)
+            wrf_file=os.path.join(wrf_dir,wrf_file)
+            utils.write_log('Read '+wrf_file)
             
-            # IF force file exists
-            if os.path.exists(force_fn):
-                utils.write_log('Delete existing wind file...%s' % force_fn, 30)
-                os.remove(force_fn)
+            utils.write_log(print_prefix+'Read WRFOUT surface wind...')
+            wrf_hdl=nc4.Dataset(wrf_file)
             
-            curr_time=self.strt_time
+            wrf_u10 = wrf.getvar(
+                    wrf_hdl, 'U10', 
+                    timeidx=wrf.ALL_TIMES, method="cat")
+            wrf_v10 = wrf.getvar(
+                    wrf_hdl, 'V10',
+                    timeidx=wrf.ALL_TIMES, method="cat")
+            wrf_time=wrf.extract_times(
+                    wrf_hdl,timeidx=wrf.ALL_TIMES, do_xtime=False)
+            wrf_hdl.close()
+            
+            wrf_time=[pd.to_datetime(itm) for itm in wrf_time]
+            
+            utils.write_log(print_prefix+'Query Wind Timestamp:'+str(curr_time))
+            u10_tmp=wrf_u10
+            v10_tmp=wrf_v10
 
-            # iter timeframes 
-            while curr_time < self.end_time:
-                wrf_file=io.get_wrf_fn(curr_time, wrf_domain)
-                wrf_file=os.path.join(wrf_dir,wrf_file)
-                utils.write_log('Read '+wrf_file)
+            swan_u = interp_wrf2swan(u10_tmp, lat_swan, lon_swan)
+            swan_v = interp_wrf2swan(v10_tmp, lat_swan, lon_swan)
+            
+            if 'swan_uv' in locals():# already defined
+                swan_uv=np.concatenate((swan_uv, swan_u, swan_v), axis=0)
+            else:
+                swan_uv=np.concatenate((swan_u, swan_v), axis=0)
+            
+            curr_time=curr_time+self.wind_time_delta
+            
+        # add one more time stamp to close up the file
+        swan_uv=np.concatenate((swan_uv, swan_u, swan_v), axis=0)
                 
-                utils.write_log(print_prefix+'Read WRFOUT surface wind...')
-                wrf_hdl=nc4.Dataset(wrf_file)
-                
-                wrf_u10 = wrf.getvar(
-                        wrf_hdl, 'U10', 
-                        timeidx=wrf.ALL_TIMES, method="cat")
-                wrf_v10 = wrf.getvar(
-                        wrf_hdl, 'V10',
-                        timeidx=wrf.ALL_TIMES, method="cat")
-                wrf_time=wrf.extract_times(
-                        wrf_hdl,timeidx=wrf.ALL_TIMES, do_xtime=False)
-                wrf_hdl.close()
-                
-                wrf_time=[pd.to_datetime(itm) for itm in wrf_time]
-                
-                utils.write_log('Query Wind Timestamp:'+str(curr_time))
-                u10_tmp=wrf_u10
-                v10_tmp=wrf_v10
-
-                utils.write_log('Interpolate U wind...')
-                swan_u = interp_wrf2swan(u10_tmp, lat_swan, lon_swan)
-                utils.write_log('Interpolate V wind...')
-                swan_v = interp_wrf2swan(v10_tmp, lat_swan, lon_swan)
-                
-                if 'swan_uv' in locals():# already defined
-                    swan_uv=np.concatenate((swan_uv, swan_u, swan_v), axis=0)
-                else:
-                    swan_uv=np.concatenate((swan_u, swan_v), axis=0)
-                
-                curr_time=curr_time+self.wind_time_delta
-                
-            # add one more time stamp to close up the file
-            swan_uv=np.concatenate((swan_uv, swan_u, swan_v), axis=0)
-                    
-            utils.write_log('Output...')
-            with open(force_fn, 'a') as f:
-                np.savetxt(f, swan_uv, fmt='%7.2f', delimiter=' ')
-                f.write('\n')
-            del swan_uv
+        utils.write_log('Output...')
+        with open(force_fn, 'a') as f:
+            np.savetxt(f, swan_uv, fmt='%7.2f', delimiter=' ')
+            f.write('\n')
+        del swan_uv
 def is_domain_within_bdyfile(lat_swan, lon_swan, lat_bdy, lon_bdy):
     '''
     test if swan domain is within the boundary file domain

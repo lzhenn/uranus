@@ -33,6 +33,7 @@
  auxinput1_inname                    = "met_em.d<domain>.<date>",
  io_form_auxinput4                   = 2,
  io_form_auxinput2                   = 2,
+ iofields_filename = "solar.txt","solar.txt","solar.txt","solar.txt"
  /
 
  &domains
@@ -165,7 +166,9 @@
  dtramp_min                          = 60.0,
  /
 
-
+&diags
+solar_diagnostics = 1,
+/
 
  &dfi_control
  /

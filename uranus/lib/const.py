@@ -5,7 +5,6 @@ PKG_NAME = 'uranus'
 
 
 MODE_FLAG_DIC={
-    # 'mode':[atm, ocn, wav]
     'shu':[1, 0, 0],
     'neptune':[0, 1, 0],
     'calypso':[0, 0, 1],
@@ -13,10 +12,11 @@ MODE_FLAG_DIC={
     'poseidon':[0, 1, 1],
     'aeolus':[1, 0, 1],
     'njord':[1, 1, 1]
-}    
+}   
+
 
 # WRF
-UNGRIB_CLEAN_LIST=['CFS', 'ERA', 'SST', 'PFILE', 'GFS', 'CPSV3','BCMM']
+UNGRIB_CLEAN_LIST=['CFS', 'ERA', 'SST', 'PFILE', 'GFS', 'CPSV3','BCMM', 'GRIBFILE']
 METGRID_CLEAN_LIST=['met_em']
 WRF_CLEAN_LIST=['met_em','wrfinput_','wrflowinp_','wrffda_','wrfrst_']
 MACHINE_DIC={
@@ -28,6 +28,14 @@ MACHINE_DIC={
         'aegir_root':'/home/lzhenn/array74/Njord_Calypso/COAWST_Aegir',
         'poseidon_root':'/home/lzhenn/array74/Njord_Calypso/COAWST_Poseidon',
         'calypso_root':'/home/lzhenn/array74/Njord_Calypso/COAWST_Calypso',
+        'cfgdb_root':'/home/lzhenn/array74/workspace/uranus/uranus/nml_db/',
+        'domdb_root':'/home/lzhenn/array74/Njord_Calypso/domaindb/'
+    },
+    'hqlx181':{ # operational njord
+        'bashrc':'/home/lzhenn/.bashrc_intel20_amd',
+        'mpicmd':'mpirun', 'corespernode':192, 'nodes':1,
+        'metgrid_np':32, 'real_np':32, 'wrf_np':32,
+        'njord_root':'/home/lzhenn/array181/op_njord/model/COAWST_Njord/',
         'cfgdb_root':'/home/lzhenn/array74/workspace/uranus/uranus/nml_db/',
         'domdb_root':'/home/lzhenn/array74/Njord_Calypso/domaindb/'
     },
@@ -49,6 +57,7 @@ MACHINE_DIC={
     },    
     'pird':{
         'bashrc':'/g6/cmme/COAWST-S2S/bashrc_coawst_run',
+        'chck_cmd':'squeue | grep cmme',
         'mpicmd':'sbatch', 'corespernode':32, 'nodes':3,
         'metgrid_np':16, 'real_np':16, 'wrf_np':64,
         'aegir_root':'/g6/cmme/COAWST-S2S/model/COAWST_Aegir',
@@ -58,9 +67,15 @@ MACHINE_DIC={
     }
 
 }
-for itm in ['47','62','65','69','129','130','133','132','111','100']:
+for itm in [
+    '47','54','62','65','69','129',
+    '130','133','132','111','100','174','179','182']:
     MACHINE_DIC['hqlx'+itm]=MACHINE_DIC['hqlx74']
-                
+
+NML_SPECIFIC={
+    'SEAsia_4km':{'metgrid_np':32, 'real_np':64}
+}
+       
 DRV_DIC={
     # WRF
     'cpsv3_wrf':{
@@ -74,12 +89,27 @@ DRV_DIC={
     },
     'bcmm_wrf':{
         'use_ungrib':False,'atm_nfrq':'6H','atm_file_nfrq':'MS', 'frm_per_file':-1,
+        'vcoord':'p', 'fg_name':"'BCMM'", 
+        'lnd_file_nfrq':'MS', 'soillv':'bcmm', 'soil_dim_name':'depth',
+        'atm_naming_pattern':'atm_$S_$F%Y_%m$F.nc4',
+        'lnd_naming_pattern':'lnd.$S.$F%Y%m$F.nc',
+        'lats':np.linspace(-90, 90, 145), 
+        'lons':np.linspace(0.0,358.75,288), 'plv':'PL18',
+    },
+    'MPI-ESM1-2-HR_wrf':{
+        'use_ungrib':False,'atm_nfrq':'6H','atm_file_nfrq':'MS', 'frm_per_file':-1,
         'vcoord':'p',  
         'lnd_file_nfrq':'MS', 'soillv':'bcmm', 'soil_dim_name':'depth',
         'atm_naming_pattern':'atm_$S_$F%Y_%m$F.nc4',
         'lnd_naming_pattern':'lnd.$S.$F%Y%m$F.nc',
         'lats':np.linspace(-90, 90, 145), 
         'lons':np.linspace(0.0,358.75,288), 'plv':'PL18',
+    },
+    'era5_wrf':{
+        'use_ungrib':True,'atm_nfrq':'3H','nsoil':4,'plv':'PL26',
+        'Vtable':'Vtable.ERA-interim.pl','ungrib_prefixes':['ERASL','ERAPL'],
+        'fg_name':"'ERASL','ERAPL'",
+        'file_patterns':['*-sl.grib','*-pl.grib'],
     },
     # ROMS
     'cpsv3_roms':{
@@ -90,6 +120,7 @@ DRV_DIC={
     'hycom_roms':{
         'ocn_nfrq':'24H','ocn_file_nfrq':'1D',
         'ocn_naming_pattern':'hycom_$F%Y%m%d%H$F.nc'},
+    'roms_roms':{'ocn_naming_pattern':'roms_his_domid_%05d.nc'},
     # SWAN
     'era5_swan':{'wav_naming_pattern':'$F%Y%m%d$F-wv.grib', 'wav_nfrq':'3H', 'wav_file_nfrq':'1D','frm_per_file':8}, 
     'gfs_swan':{'wav_naming_pattern':'gfswave.t$F%H$Fz.global.0p16.f000.grib2'}    
@@ -115,6 +146,7 @@ S2NS=1000000000
 HALF_DAY_NS=43200000000000 # half day in nanoseconds
 DAY_IN_SEC=86400
 HR_IN_SEC=3600
+MIN_IN_SEC=60
 # !!! FIXED DEPTH: NEVER CHANGE THIS BELOW !!!
 DENSE_DP=np.concatenate((
     np.arange(0,50), np.arange(50, 200,10),
@@ -127,8 +159,8 @@ ROMS_VAR_NAME_MAPS={
     'zeta':['zeta','ssh','sea_surface_height','surf_el','eta_t'],
     'u':['u','water_u','uoe'],
     'v':['v','water_v','von'],
-    'lat_rho':['Y','Latitude','lat','yt_ocean'],
-    'lon_rho':['X','Longitude','lon','xt_ocean']}
+    'lat_rho':['Y','Latitude','lat','yt_ocean','eta_rho'],
+    'lon_rho':['X','Longitude','lon','xt_ocean','xi_rho']}
 
 ROMS_VAR=['zeta','temp','salt','u','v','ubar','vbar']
 CLM_TIME_VAR=['v2d','v3d','temp','salt', 'zeta', 'ocean']
@@ -192,9 +224,35 @@ FORC_VAR_DIC={'Uwind':{'long_name': 'surface u-wind component',
                 'coordinates': 'lon lat', 'time': 'lrf_time'}
 } 
 # -----------------------SWAN--------------------------
-SWAN_CLEAN_LIST=['swan_bdy','Errfile','PRINT','swan_d01.hot','lwavp_',
-                'dir_','hsig_','hswell_','swan_','tps_','per_','wind_']
+SWAN_CLEAN_LIST=['swan_bdy','Errfile','PRINT','lwavp_',
+                'dir_','hsig_','hswell_','tps_','per_','wind_']
+
+
+
 
 # Physics
 RHO_WATER=1000.0
 K2C=273.15
+
+
+
+# Dataset 
+# -----------------------ERA5--------------------------
+ERA5_CONST={
+    'SL_VARS':[
+                '10m_u_component_of_wind','10m_v_component_of_wind','2m_dewpoint_temperature',
+                '2m_temperature','land_sea_mask','mean_sea_level_pressure',
+                'sea_ice_cover','sea_surface_temperature','skin_temperature',
+                'snow_depth','soil_temperature_level_1','soil_temperature_level_2',
+                'soil_temperature_level_3','soil_temperature_level_4','surface_pressure',
+                'volumetric_soil_water_layer_1','volumetric_soil_water_layer_2','volumetric_soil_water_layer_3',
+                'volumetric_soil_water_layer_4'],
+    'PL_LAYS':[
+                '50','70','100','150','200','250',
+                '300','350','400','450','500','550','600',
+                '650','700','750','775','800','825',
+                '850','875','900','925','950','975','1000'],
+    'PL_VARS':[
+                'geopotential','relative_humidity','specific_humidity',
+                'temperature','u_component_of_wind','v_component_of_wind'],
+}

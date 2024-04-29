@@ -28,9 +28,11 @@ class ROMSRocker:
             self.version='3.8'
             utils.write_log(print_prefix+'no version in cfg, use 3.8')
         romscfg=self.cfg['ROMS']
-        self.run_maker=romscfg.getboolean('gen_roms_icbc')
+        self.gen_icbc=romscfg.getboolean('gen_roms_icbc')
+        self.down_drv=romscfg.getboolean('down_drv')
+        self.restart_run=romscfg.getboolean('restart_run')
         self.strt_time,self.end_time=uranus.sim_strt_time,uranus.sim_end_time
-        
+        self.domid=uranus.domain_lv 
         time_offset=self.strt_time - const.BASE_TIME
         self.dstart=time_offset.total_seconds()/const.DAY_IN_SEC
 
@@ -38,8 +40,12 @@ class ROMSRocker:
         self.gen_surf=romscfg.getboolean('gen_surf')
         self.surf_type=romscfg['surf_type']
         self.surf_frq=romscfg['surf_frq']
+        self.surf_wrfdom=romscfg['wrf_match']
         self.surf_root=utils.parse_fmt_timepath(self.strt_time, romscfg['surf_root'])
         self.drv_dic=const.DRV_DIC[self.drv_type+'_roms']
+        if self.drv_type=='roms':
+            self.drv_dic['ocn_nfrq']=romscfg['drv_frq']
+            self.drv_dic['ocn_file_nfrq']=romscfg['drv_frq']
         self.drv_root=utils.parse_fmt_timepath(self.strt_time, romscfg['drv_root'])
         self.proj_root=uranus.proj_root
         self.domdb_root=uranus.domdb_root
@@ -51,57 +57,97 @@ class ROMSRocker:
             start=self.strt_time, end=self.end_time, freq=self.drv_dic['ocn_nfrq'])
         if len(self.frm_time_series)>1:
             self.ocn_nfrq=int((self.frm_time_series[1]-self.frm_time_series[0]).total_seconds())
-        self.ocnfn_lst, self.file_time_series=io.gen_patternfn_lst(
-            self.drv_root, self.drv_dic, self.strt_time, self.end_time, kw='ocn')
-
-    def prepare_rock(self):
+        if self.drv_type=='roms':
+            if self.domid=='d02':
+                bdydomid='d01'
+            elif self.domid=='d03':
+                bdydomid='d02'
+            self.ocnfn_lst, self.file_time_series=io.gen_roms_his_fnlst(
+                self.drv_root, self.drv_dic, bdydomid, self.frm_time_series, self.ocn_nfrq)
+        else:
+            self.ocnfn_lst, self.file_time_series=io.gen_patternfn_lst(
+                self.drv_root, self.drv_dic, self.strt_time, self.end_time, kw='ocn')
+    
+    def rock(self):
+        if self.gen_icbc:
+        # down driven data 
+            if self.down_drv:
+                self.downdrv()
+            self.build_forc() 
+            self.build_icbc() 
+    def prepare_cplrock(self):
         nml_temp=self.uranus.nml_temp
+        
+ 
         domfn=os.path.join(
                 self.domdb_root, nml_temp, '*omp.nc')
         io.symlink_files(domfn, self.proj_root)
             
-        roms_in=os.path.join(self.proj_root, 'roms_d01.in')
+        roms_in=os.path.join(self.proj_root, f'roms_{self.domid}.in')
         run_seconds=int((self.end_time-self.strt_time).total_seconds())
         ntimes=run_seconds//self.dt
         nrst=self.nrst*const.DAY_IN_SEC//self.dt
-        nhis=self.nhis*const.HR_IN_SEC//self.dt 
+        nhis=self.nhis*const.MIN_IN_SEC//self.dt 
         # only use half day
-        ndefhis=const.DAY_IN_SEC//self.dt//24
+        ndefhis=nhis
+        #ndefhis=const.DAY_IN_SEC//self.dt//24
         
-        grdname=os.path.join('Projects', nml_temp, 'roms_d01_omp.nc')
-        ininame=os.path.join('Projects', nml_temp, 'roms_d01_ini.nc')
+        # use relative path for infile modification 
+        proj_reldir=os.path.join('Projects', nml_temp)
+        grdname=os.path.join(proj_reldir, f'roms_{self.domid}_omp.nc')
+        if self.restart_run:
+            ininame= f'roms_rst_{self.domid}.nc'
+            nrrec='-1'
+        else:
+            ininame=os.path.join(proj_reldir, f'roms_ini_{self.domid}.nc')
+            nrrec='0'
         
-        clmname,bryname='',''
-        for tf in self.file_time_series: 
-            tf_str=tf.strftime('%Y%m%d%H')
-            clmname+=os.path.join('Projects', nml_temp, f'roms_d01_clm_{tf_str}.nc |\n')
-            bryname+=os.path.join('Projects', nml_temp, f'roms_d01_bdy_{tf_str}.nc |\n')
-        tf_close=self.file_time_series[-1]+datetime.timedelta(days=1)
-        tf_str=tf_close.strftime('%Y%m%d%H')
-        clmname+=os.path.join('Projects', nml_temp, f'roms_d01_clm_{tf_str}.nc')
-        bryname+=os.path.join('Projects', nml_temp, f'roms_d01_bdy_{tf_str}.nc')
+        '''
+        for tf in self.frm_time_series[:-1]: 
+            tf_str=tf.strftime('%Y%m%d%H%M')
+            clmname+=os.path.join(proj_reldir, f'roms_clm_{self.domid}_{tf_str}.nc |\n')
+            bryname+=os.path.join(proj_reldir, f'roms_bdy_{self.domid}_{tf_str}.nc |\n')
+        tf_close=self.frm_time_series[-1]
+        tf_str=tf_close.strftime('%Y%m%d%H%M')
+        if self.version=='3.5': # bug fix for 3.5
+            clmname+=os.path.join(proj_reldir, f'roms_clm_{self.domid}_{tf_str}.nc |\n')
+            bryname+=os.path.join(proj_reldir, f'roms_bdy_{self.domid}_{tf_str}.nc |\n')
+            tf_close=tf_close+datetime.timedelta(seconds=self.ocn_nfrq)
+            tf_str=tf_close.strftime('%Y%m%d%H%M')
+            clmname+=os.path.join(proj_reldir, f'roms_clm_{self.domid}_{tf_str}.nc')
+            bryname+=os.path.join(proj_reldir, f'roms_bdy_{self.domid}_{tf_str}.nc')
+        else:    
+            clmname+=os.path.join(proj_reldir, f'roms_clm_{self.domid}_{tf_str}.nc')
+            bryname+=os.path.join(proj_reldir, f'roms_bdy_{self.domid}_{tf_str}.nc')
+        ''' 
         
-        frcname=os.path.join('Projects', nml_temp, 'roms_forc.nc') 
+        clmname=os.path.join(proj_reldir, f'roms_clm_{self.domid}.nc')
+        bryname=os.path.join(proj_reldir, f'roms_bdy_{self.domid}.nc')
+        frcname=os.path.join(proj_reldir, f'roms_forc_{self.domid}.nc') 
         
         tf_start=self.file_time_series[0]       
         tf_str=tf_start.strftime('%Y%m%d')
         sed_dic={
             'NtileI':self.uranus.ntasks_iocn, 'NtileJ':self.uranus.ntasks_jocn,
-            'NTIMES':ntimes, 'DT':f"{self.dt:.1f}d0", 'NRST':nrst, 'NHIS':nhis, 
+            'NTIMES':ntimes, 'DT':f"{self.dt:.1f}d0", 'NRST':nrst, 'NRREC':nrrec,
+            'NHIS':nhis, 
             'NDEFHIS':ndefhis, 'NDIA':nhis, #'NAVG':nhis, 
             'GRDNAME':grdname, 'ININAME':ininame, 'CLMNAME':clmname, 'BRYNAME':bryname,
             'FRCNAME':frcname,
-            'DSTART':f'{self.dstart:.1f}d0',
+            'DSTART':f'{self.dstart:.3f}d0',
             #'TIME_REF':f"{tf_str}.0d0"
         }
         for key, itm in sed_dic.items():
             utils.sedline(key, f'{key} == {itm}', roms_in, count=1)
-  
+    def downdrv(self):
+        if self.down_drv:
+            self.uranus.crawler.down_ocn()
+    
     def load_domain(self):
         """ load domain file """
         utils.write_log(print_prefix+'Load domain file...')
         domfn=os.path.join(
-            self.domdb_root, self.uranus.nml_temp, 'roms_d01_omp.nc')
+            self.domdb_root, self.uranus.nml_temp, f'roms_{self.domid}_omp.nc')
         self.ds_static=xr.load_dataset(domfn)
         ds_static=self.ds_static
         self.mask=ds_static['mask_rho'].values
@@ -112,7 +158,7 @@ class ROMSRocker:
        
         # load sample file
         sampfn=os.path.join(
-            self.uranus.domdb_root, self.uranus.nml_temp, 'roms_d01_inismp.nc')
+            self.uranus.domdb_root, self.uranus.nml_temp, f'roms_{self.domid}_inismp.nc')
         self.ds_smp=xr.load_dataset(sampfn)
         self.hc=self.ds_smp['hc']
         
@@ -146,7 +192,7 @@ class ROMSRocker:
         if self.surf_type=='wrf':
             import netCDF4 as nc4
             import wrf
-            surf_file=io.get_wrf_fn(curr_time, 'd01')
+            surf_file=io.get_wrf_fn(curr_time, f'{self.surf_wrfdom}')
             surf_file=os.path.join(surf_dir,surf_file)
             wrf_hdl=nc4.Dataset(surf_file)
             XLAT=wrf.getvar(wrf_hdl,'XLAT')
@@ -155,7 +201,7 @@ class ROMSRocker:
             wrf_hdl.close()
             # iter timeframes 
             for idx,curr_time in enumerate(forc_time_series):
-                surf_file=io.get_wrf_fn(curr_time, 'd01')
+                surf_file=io.get_wrf_fn(curr_time, f'{self.surf_wrfdom}')
                 utils.write_log(print_prefix+'Read surface forcing from '+surf_file)
                 surf_file=os.path.join(surf_dir,surf_file)
                 wrf_hdl=nc4.Dataset(surf_file)
@@ -176,12 +222,10 @@ class ROMSRocker:
                     ds_forc[roms_var].values[idx,:,:]=temp_var.values
                 wrf_hdl.close()
         forc_fn=os.path.join(
-            self.proj_root,'roms_forc.nc')
+            self.proj_root,f'roms_forc_{self.domid}.nc')
         ds_forc.to_netcdf(forc_fn)
     def build_icbc(self):
         """ build icbcs for ROMS """
-        if not(self.run_maker):
-            return
         utils.write_log(
             print_prefix+'build icbcs from %s to %s...'%(
                 self.strt_time.strftime('%Y%m%d%H'),self.end_time.strftime('%Y%m%d%H')))
@@ -189,50 +233,78 @@ class ROMSRocker:
         # load domain file
         self.load_domain()
         
-                
+        bdysmpfn=os.path.join(
+            self.domdb_root, self.uranus.nml_temp,f'roms_{self.domid}_bdysmp.nc')
+        self.ds_bdy=xr.load_dataset(bdysmpfn)         
+        
+        clmsmpfn=os.path.join(
+            self.domdb_root, self.uranus.nml_temp,f'roms_{self.domid}_clmsmp.nc')
+        self.ds_clm=xr.load_dataset(clmsmpfn)
+        
+        self.bdy_fnlst, self.clm_fnlst=[],[]
         for it, tf in enumerate(self.frm_time_series):
             utils.write_log(
-                print_prefix+'build icbcs@%s...'% tf.strftime('%Y%m%d%H'))
+                print_prefix+'build icbcs@%s...'% tf.strftime('%Y%m%d%H%M'))
 
             if tf in self.file_time_series:
                 # load raw file  
                 self.load_raw(it) 
-            
-            # first deal with zeta
-            roms_var='zeta'
-            if self.drv_type=='cfs':
-                utils.write_log(
-                    print_prefix+'cfs data set zeta=0...')
-                self.ds_smp['zeta'].values[:]=0.0
+            if self.drv_type=='roms':
+                self.interp_roms()
             else:
-                self.inter2d(roms_var)
-            # calculate vertical coordinate before 3d interpolation
-            zeta = self.ds_smp['zeta'] 
-            h=zeta # obtain dimensional information of zeta  
-            h= self.ds_static.h.values
-            z_rho = mathlib.sigma2depth(zeta, h, self.ds_smp)
-            self.dz=z_rho[1:,:,:]-z_rho[:-1,:,:]
-            self.dz=np.concatenate((self.dz,self.dz[-1:,:,:]),axis=0)
-            self.dp_idx=mathlib.assign_depth_idx(
-                z_rho, self.mask)
-
-            # Hot Spot: May Comment out 3D interp for test
-            for roms_var in ['temp','salt','u','v']:
-                self.inter3d(roms_var)
+                # first deal with zeta
+                roms_var='zeta'
+                if self.drv_type=='cfs':
+                    utils.write_log(
+                        print_prefix+'cfs data set zeta=0...')
+                    self.ds_smp['zeta'].values[:]=0.0
+                else:
+                    self.inter2d(roms_var)
+                # calculate vertical coordinate before 3d interpolation
+                zeta = self.ds_smp['zeta'] 
+                h=zeta # obtain dimensional information of zeta  
+                h= self.ds_static.h.values
+                z_rho = mathlib.sigma2depth(zeta, h, self.ds_smp)
+                self.dz=z_rho[1:,:,:]-z_rho[:-1,:,:]
+                self.dz=np.concatenate((self.dz,self.dz[-1:,:,:]),axis=0)
+                self.dp_idx=mathlib.assign_depth_idx(
+                    z_rho, self.mask)
+                
+                # Hot Spot: May Comment out 3D interp for test
+                for roms_var in ['temp','salt','u','v']:
+                    self.inter3d(roms_var)
+                
+            
             if tf==self.strt_time:
                 # pkg time
                 self.ds_smp['ocean_time'].values[:]=int(self.dstart*const.DAY_IN_SEC)*const.S2NS
                 self.ds_smp=self.ds_smp.assign_coords({'ocean_time':self.ds_smp['ocean_time']})
                 # output
-                inifn=os.path.join(self.proj_root, 'roms_d01_ini.nc')
+                inifn=os.path.join(self.proj_root, f'roms_ini_{self.domid}.nc')
                 self.ds_smp.to_netcdf(inifn)
                 utils.write_log(print_prefix+'build initial conditions done!')
-            self.build_clm(it, tf)
+            if self.drv_type!='roms':
+                self.build_clm(it, tf)
             self.build_bdy(it, tf)
-   
+        self.merge_icbc()
+    
+    def merge_icbc(self):
+        '''merge all icbcs into one single file'''
+        if self.drv_type!='roms':
+            ds_lst=[xr.load_dataset(fn) for fn in self.clm_fnlst]
+            ds_all=xr.merge(ds_lst)
+            ds_all.to_netcdf(os.path.join(
+                self.proj_root, 'roms_clm_%s.nc' %self.domid))
+        
+        ds_lst=[xr.load_dataset(fn) for fn in self.bdy_fnlst]
+        ds_all=xr.merge(ds_lst)
+        ds_all.to_netcdf(os.path.join(
+            self.proj_root, 'roms_bdy_%s.nc' %self.domid))
+ 
     def load_raw(self, it):
-        """ load raw GCM files """
+        """ load raw GCM/ROMS files to build ICBC"""
         fn = self.ocnfn_lst[it]
+        utils.write_log(print_prefix+'Load raw file: '+fn)
         self.ds_raw=xr.load_dataset(fn)
         ds_raw=self.ds_raw
         self.varname_remap()
@@ -241,6 +313,8 @@ class ROMSRocker:
             if self.varmap['lat_rho']=='Y':
                 ds_raw=ds_raw.rename_dims({
                     'Depth':'depth','Y':'lat','X':'lon'})
+                ds_raw=ds_raw.drop_indexes(
+                    ['Depth'])
                 ds_raw=ds_raw.assign_coords({
                     'depth':ds_raw['Depth'],
                     'lon': ds_raw['Longitude'][0,:], 
@@ -269,6 +343,7 @@ class ROMSRocker:
                 'lon': ds_raw['xt_ocean'], 
                 'lat': ds_raw['yt_ocean']})
             ds_raw['lon']=ds_raw['lon']+360.
+            
         self.ds_raw=ds_raw
     def varname_remap(self):
         """ remap variable names to roms standard """
@@ -291,7 +366,46 @@ class ROMSRocker:
                     return
                 utils.throw_error(
                     print_prefix+'%s not found in raw map!'% roms_var)
-    
+    def interp_roms(self):
+        '''
+        first fill the missing value
+        then interpolate to new 2d grid 
+        '''
+        smpcoords={
+            'lon1d_rho':self.lon1d,'lat1d_rho':self.lat1d,
+            'lon1d_u':self.lon_u,'lat1d_u':self.lat_u,
+            'lon1d_v':self.lon_v,'lat1d_v':self.lat_v}
+        roms_vardimmap=[
+            ('zeta','rho'),('temp','rho'),
+            ('salt','rho'),('u','u'),('v','v'),
+            ('ubar','u'),('vbar','v')]
+        for (roms_varname, dimname) in roms_vardimmap:
+            utils.write_log(print_prefix+roms_varname+' 2d-interp...')
+            lat1d_raw=self.ds_raw[f'lat_{dimname}'][:,0].values
+            lon1d_raw=self.ds_raw[f'lon_{dimname}'][0,:].values 
+            raw_var=self.ds_raw[roms_varname]
+            smp_var=self.ds_smp[roms_varname]
+            # unify the var using 1d lat and lon
+            if roms_varname in ['zeta', 'ubar','vbar']:
+                da_temp= xr.DataArray(
+                    raw_var.values, dims=('time', 'lat', 'lon'), 
+                    coords={'time':[0],'lat': lat1d_raw, 'lon': lon1d_raw})
+            else:
+                ndpth=smp_var.shape[1] 
+                da_temp= xr.DataArray(
+                    raw_var.values[:,0:ndpth,:,:], dims=('time', 'depth', 'lat', 'lon'), 
+                    coords={'time':[0],'depth': np.arange(ndpth), 'lat': lat1d_raw, 'lon': lon1d_raw})
+            da_temp = da_temp.interpolate_na(
+                dim='lon', method="linear", fill_value="extrapolate")
+            da_temp = da_temp.interpolate_na(
+                dim='lat', method="linear", fill_value="extrapolate")
+            da_temp=da_temp.interp(
+                {'lat':smpcoords[f'lat1d_{dimname}'],'lon':smpcoords[f'lon1d_{dimname}']},
+                method='linear')
+            smp_var.values =da_temp.values
+            # down for debug
+            #if roms_varname in ['zeta', 'ubar','vbar', 'u', 'v']:
+            #    smp_var.values=smp_var.values*0.0
     def inter2d(self, roms_varname):
         '''
         first fill the missing value
@@ -383,9 +497,8 @@ class ROMSRocker:
     def build_clm(self, idt, time_frm):
         '''Build climatology file'''
         utils.write_log(
-            print_prefix+'build clm file@%s...' % time_frm.strftime('%Y%m%d%H'))
-        clmsmpfn=os.path.join(self.domdb_root, self.uranus.nml_temp,'roms_d01_clmsmp.nc')
-        ds_clm=xr.load_dataset(clmsmpfn)
+            print_prefix+'build clm file@%s...' % time_frm.strftime('%Y%m%d%H%M'))
+        ds_clm=self.ds_clm
         # loop the variables to assign values
         for varname in const.ROMS_VAR:
             ds_clm[varname].values=self.ds_smp[varname].values
@@ -402,28 +515,28 @@ class ROMSRocker:
             #ds_clm=ds_clm.assign_coords({var:var_time})
         
         clmfn=os.path.join(
-            self.proj_root,'roms_d01_clm_%s.nc'% time_frm.strftime('%Y%m%d%H'))
+            self.proj_root,f'roms_clm_{self.domid}_%s.nc'% time_frm.strftime('%Y%m%d%H%M'))
+        self.clm_fnlst.append(clmfn)
         ds_clm.to_netcdf(clmfn)
+        # bug fix for 3.5
         '''
-        # add one additional bdy file to cover the end time
-        if time_frm==self.frm_time_series[-1]:
+        if self.version=='3.5' and time_frm==self.frm_time_series[-1]:
             time_frm=self.frm_time_series[-1]+datetime.timedelta(
                     seconds=self.ocn_nfrq)
             for var in const.CLM_TIME_VAR:
                 var_time=ds_clm[var+'_time']
                 var_time.values[:]=(idt+1)*self.ocn_nfrq*const.S2NS
             clmfn=os.path.join(
-                self.proj_root,'coawst_clm_%s.nc'% time_frm.strftime('%Y%m%d%H'))
-            ds_clm.to_netcdf(clmfn, engine='netcdf4', format='NETCDF3_64BIT')
+                self.proj_root,'coawst_clm_%s.nc'% time_frm.strftime('%Y%m%d%H%M'))
+            self.clm_fnlst.append(clmfn)
+            ds_clm.to_netcdf(clmfn)
         '''
     def build_bdy(self, idt, time_frm):
         '''Build bdy file'''
         utils.write_log(
-            print_prefix+'build bdy file@%s...' % time_frm.strftime('%Y%m%d%H'))
-        bdysmpfn=os.path.join(
-            self.domdb_root, self.uranus.nml_temp,'roms_d01_bdysmp.nc')
-        ds_bdy=xr.load_dataset(bdysmpfn)
-        
+            print_prefix+'build bdy file@%s...' % time_frm.strftime('%Y%m%d%H%M'))
+       
+        ds_bdy=self.ds_bdy
         for varname in ['zeta','ubar','vbar']:
             var_bdy=varname+'_south'
             ds_bdy[var_bdy].values=self.ds_smp[varname].values[:,0,:]
@@ -448,12 +561,26 @@ class ROMSRocker:
         for var in const.BDY_TIME_VAR:
             var_time=ds_bdy[var+'_time']
             if self.version=='3.5':
-                var_time.values[:]=int(time_offset.total_seconds()-1)*const.S2NS
+                var_time.values[:]=int(time_offset.total_seconds())*const.S2NS
+                #var_time.values[:]=int(time_offset.total_seconds()-1)*const.S2NS
             else:
                 var_time.values[:]=int(time_offset.total_seconds())*const.S2NS
             #ds_bdy=ds_bdy.assign_coords({var:var_time})
-
         bdyfn=os.path.join(
-            self.proj_root,'roms_d01_bdy_%s.nc'% time_frm.strftime('%Y%m%d%H'))
+            self.proj_root,f'roms_bdy_{self.domid}_%s.nc'% time_frm.strftime('%Y%m%d%H%M'))
+        self.bdy_fnlst.append(bdyfn)
         ds_bdy.to_netcdf(bdyfn)
+        '''
+        # bug fix for 3.5
+        if self.version=='3.5' and time_frm==self.frm_time_series[-1]:
+            time_frm=self.frm_time_series[-1]+datetime.timedelta(
+                    seconds=self.ocn_nfrq)
+            for var in const.BDY_TIME_VAR:
+                var_time=ds_bdy[var+'_time']
+                var_time.values[:]=(idt+1)*self.ocn_nfrq*const.S2NS
+            bdyfn=os.path.join(
+                self.proj_root,f'roms_bdy_{self.domid}_%s.nc'% time_frm.strftime('%Y%m%d%H%M'))
+            self.bdy_fnlst.append(bdyfn)
+            ds_bdy.to_netcdf(bdyfn)
+        ''' 
  
