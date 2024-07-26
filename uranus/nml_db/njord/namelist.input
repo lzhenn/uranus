@@ -37,10 +37,22 @@
  max_dom                             = 3,
  e_we                                = 340,   331,   340,
  e_sn                                = 340,   301,   310,
- e_vert                              = 51,    51,    51,
+ e_vert                              = 39,    39,    39,
  p_top_requested                     = 5000,
- num_metgrid_levels                  = 34,
+ num_metgrid_levels                  = 38,
  num_metgrid_soil_levels             = 4,
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ eta_levels              = 1.0000, 0.9979, 0.9956, 0.9931,
+                       0.9904, 0.9875, 0.9844, 0.9807,
+                       0.9763, 0.9711, 0.9649, 0.9575,
+                       0.9488, 0.9385, 0.9263, 0.9120,
+                       0.8951, 0.8753, 0.8521, 0.8251,
+                       0.7937, 0.7597, 0.7229, 0.6833,
+                       0.6410, 0.5960, 0.5484, 0.4985,
+                       0.4467, 0.3934, 0.3393, 0.2850,
+                       0.2316, 0.1801, 0.1324, 0.0903,
+                                       0.0542, 0.0241, 0.0000
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  dx                                  = 9000,  3000,  1000,
  dy                                  = 9000,  3000,  1000,
  grid_id                             = 1,     2,     3,
@@ -54,12 +66,13 @@
   /
 
  &physics
- mp_physics                          = 10,    10,    10,
+ mp_physics                          = 8,    10,    10,
  ra_lw_physics                       = 4,     4,     4,
  ra_sw_physics                       = 4,     4,     4,
- radt                                = 45,   45,    45,
+ radt                                = 10,   10,    10,
  slope_rad                           = 0,     0,     1,
  topo_shading                        = 0,     0,     1,
+! pbl and sf 2 for MYJ and 5 for MYNN 
  sf_sfclay_physics                   = 5,     5,     5,
  sf_surface_physics                  = 2,     2,     2,
  sf_urban_physics                    = 0,     0,     0,
@@ -82,7 +95,7 @@
 &fdda
  grid_fdda                           = 2,     0,     0,     0,
  gfdda_inname                        = "wrffdda_d<domain>",
- gfdda_end_h                         = 999,   999,     0,     0,
+ gfdda_end_h                         = 999999,   999,     0,     0,
  gfdda_interval_m                    = 180,   60,     0,     0,
  if_no_pbl_nudging_uv       = 1        
  if_no_pbl_nudging_t        = 1        
@@ -93,15 +106,16 @@
   k_zfac_t                  = 20       
  if_zfac_q                  = 1        
   k_zfac_q                  = 20       
- guv                        = 0.0003   
- gt                         = 0.0003   
- gq                         = 0.0003   
+ guv                        = 0.0003  
+ gt                         = 0.0003  
+ gq                         = 0.0003  
  if_ramping                 = 1
  dtramp_min                 = 60
+ xwavenum = 4
+ ywavenum = 4
  /
 
  &dynamics
- hybrid_opt                          = 2, 
  w_damping                           = 0,
  diff_opt                            = 1,     1,     1,
  km_opt                              = 4,     4,     4,

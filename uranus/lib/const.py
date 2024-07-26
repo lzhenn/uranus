@@ -5,6 +5,7 @@ PKG_NAME = 'uranus'
 
 
 MODE_FLAG_DIC={
+    # atm, ocn, wav
     'shu':[1, 0, 0],
     'neptune':[0, 1, 0],
     'calypso':[0, 0, 1],
@@ -31,11 +32,24 @@ MACHINE_DIC={
         'cfgdb_root':'/home/lzhenn/array74/workspace/uranus/uranus/nml_db/',
         'domdb_root':'/home/lzhenn/array74/Njord_Calypso/domaindb/'
     },
+    'hqlx130':{
+        'bashrc':'/home/lzhenn/.bashrc_intel20_amd',
+        'mpicmd':'mpirun', 'corespernode':128, 'nodes':1,
+        'metgrid_np':16, 'real_np':16, 'wrf_np':32,
+        'njord_root':'/home/lzhenn/array130/COAWST_Njord',
+        'aegir_root':'/home/lzhenn/array130/COAWST_Aegir',
+        'poseidon_root':'/home/lzhenn/array130/COAWST_Poseidon',
+        'calypso_root':'/home/lzhenn/array130/COAWST_Calypso',
+        'cfgdb_root':'/home/lzhenn/array74/workspace/uranus/uranus/nml_db/',
+        'domdb_root':'/home/lzhenn/array74/Njord_Calypso/domaindb/'
+    },
     'hqlx181':{ # operational njord
         'bashrc':'/home/lzhenn/.bashrc_intel20_amd',
         'mpicmd':'mpirun', 'corespernode':192, 'nodes':1,
-        'metgrid_np':32, 'real_np':32, 'wrf_np':32,
+        'metgrid_np':32, 'real_np':48, 'wrf_np':32,
         'njord_root':'/home/lzhenn/array181/op_njord/model/COAWST_Njord/',
+        'poseidon_root':'/home/lzhenn/array181/op_njord/model/COAWST_Poseidon',
+        'opexe_root':'/home/lzhenn/array181/op_njord/model/COAWST_Njord/',
         'cfgdb_root':'/home/lzhenn/array74/workspace/uranus/uranus/nml_db/',
         'domdb_root':'/home/lzhenn/array74/Njord_Calypso/domaindb/'
     },
@@ -69,11 +83,11 @@ MACHINE_DIC={
 }
 for itm in [
     '47','54','62','65','69','129',
-    '130','133','132','111','100','174','179','182']:
+    '133','132','111','100','174','179','182']:
     MACHINE_DIC['hqlx'+itm]=MACHINE_DIC['hqlx74']
 
 NML_SPECIFIC={
-    'SEAsia_4km':{'metgrid_np':32, 'real_np':64}
+    'SEAsia_4km':{'metgrid_np':48, 'real_np':64}
 }
        
 DRV_DIC={
@@ -109,7 +123,13 @@ DRV_DIC={
         'use_ungrib':True,'atm_nfrq':'3H','nsoil':4,'plv':'PL26',
         'Vtable':'Vtable.ERA-interim.pl','ungrib_prefixes':['ERASL','ERAPL'],
         'fg_name':"'ERASL','ERAPL'",
-        'file_patterns':['*-sl.grib','*-pl.grib'],
+        'file_patterns':['%Y%m*-sl.grib','%Y%m*-pl.grib'],
+    },
+    'gfs_wrf':{
+        'use_ungrib':True,'atm_nfrq':'3H','nsoil':4,'plv':'PL33',
+        'Vtable':'Vtable.GFS','ungrib_prefixes':['GFS'],
+        'fg_name':"'GFS'",
+        'file_patterns':['gfs.t??z.pgrb2.0p25.f*'],
     },
     # ROMS
     'cpsv3_roms':{
@@ -117,13 +137,17 @@ DRV_DIC={
         'ocn_naming_pattern':'ocean_$F%Y_%m_%d$F.nc',
     },
     'cfs_roms':{'ocn_naming_pattern':'ocnf$F%Y%m%d%H$F.01.$I%Y%m%d%H$I.grb2'},
+    'cfsr_roms':{
+        'ocn_nfrq':'24H','ocn_file_nfrq':'1D',
+        'ocn_naming_pattern':'ocnh01.gdas.$I%Y%m%d%H$I.grb2'},
     'hycom_roms':{
         'ocn_nfrq':'24H','ocn_file_nfrq':'1D',
         'ocn_naming_pattern':'hycom_$F%Y%m%d%H$F.nc'},
-    'roms_roms':{'ocn_naming_pattern':'roms_his_domid_%05d.nc'},
+    'roms_roms':{'ocn_naming_pattern':'roms_his_domid_%05d.nc4'},
     # SWAN
     'era5_swan':{'wav_naming_pattern':'$F%Y%m%d$F-wv.grib', 'wav_nfrq':'3H', 'wav_file_nfrq':'1D','frm_per_file':8}, 
-    'gfs_swan':{'wav_naming_pattern':'gfswave.t$F%H$Fz.global.0p16.f000.grib2'}    
+    'era5mon_swan':{'wav_naming_pattern':'$F%Y%m$F-sl.grib', 'wav_nfrq':'3H', 'wav_file_nfrq':'1M','frm_per_file':240}, 
+    'gfs_swan':{'wav_naming_pattern':'gfswave.t12z.global.0p16.f$A.grib2','wav_nfrq':'3H','wav_file_nfrq':'3H'}    
 }
 
 # Lower bottom level 
@@ -170,7 +194,11 @@ ROMS_WRF_FORC_MAPS={
     'Uwind': 'U10', 'Vwind': 'V10', 
     'Pair': 'slp', 'Tair': 'T2',  
     'Qair': 'rh2', 
-    'swrad': 'GSW', 'lwrad': 'LWDNB', 'lwrad_down': 'GLW'}
+    #'swrad': 'GSW', 
+    'swrad': 'SWDOWN', 
+    #'lwrad': 'LWDNB', 
+    'lwrad': 'GLW', 
+    'lwrad_down': 'GLW'}
 FORC_TIMEVAR_LIST=['wind','pair','tair','qair','rain','srf','lrf']
 FORC_VAR_DIC={'Uwind':{'long_name': 'surface u-wind component', 
                   'units': 'meter second-1', 
@@ -222,7 +250,10 @@ FORC_VAR_DIC={'Uwind':{'long_name': 'surface u-wind component',
                 'negative_value': 'upward flux, cooling', 
                 'field': 'lwrad_down, scalar, series', 
                 'coordinates': 'lon lat', 'time': 'lrf_time'}
-} 
+}
+ROMS_CLEAN_LIST=['roms_bdy_','roms_ini_','roms_clm_']
+
+
 # -----------------------SWAN--------------------------
 SWAN_CLEAN_LIST=['swan_bdy','Errfile','PRINT','lwavp_',
                 'dir_','hsig_','hswell_','tps_','per_','wind_']

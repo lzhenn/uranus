@@ -1,10 +1,9 @@
 #/usr/bin/env python3
 """Build WRF preprocess workflow"""
-import os, shutil, cftime, subprocess
+import os, shutil, subprocess
 import pandas as pd
 import xarray as xr
 import numpy as np
-import time
 from scipy.io import FortranFile
 from . import utils, io, const, mathlib
 
@@ -74,7 +73,7 @@ class WRFRocker:
             utils.sedline('interval_seconds',f'interval_seconds = {interval}',nml_dest) 
             prefix=self.drv_type.upper()
             utils.sedline('prefix',f"prefix = '{prefix}'",nml_dest) 
-            utils.sedline('fg_name',f"fg_name = '{prefix}'",nml_dest) 
+            utils.sedline('fg_name',f"fg_name = '{self.drv_dic['fg_name']}'",nml_dest) 
             
             # WRF: deal with namelist.input
             nml_src=os.path.join(
@@ -130,8 +129,16 @@ class WRFRocker:
                 os.path.join(self.wps_root,'Vtable'))
             for fp,prefix in zip(drv_dic['file_patterns'],drv_dic['ungrib_prefixes']):
                 # ./link_grib.csh
-                drv_files=os.path.join(self.drv_root,fp)
-                cmd=f'cd {self.wps_root}; ./link_grib.csh {drv_files};'
+                day_series=pd.date_range(
+                    start=self.uranus.sim_strt_time, end=self.uranus.sim_end_time, freq='D')
+                
+                fp_single=day_series[0].strftime(fp)
+                fnlist=[os.path.join('$DRV_ROOT',fp_single)]
+                for day in day_series:
+                    if day.strftime(fp)!=fp_single:
+                        fp_single=day.strftime(fp)
+                        fnlist.append(os.path.join('$DRV_ROOT',fp_single))
+                cmd=f'cd {self.wps_root}; DRV_ROOT={self.drv_root}; ./link_grib.csh {" ".join(fnlist)};'
                 cmd=f'{cmd}source {self.mach_meta["bashrc"]};./ungrib.exe'
                 utils.sedline('prefix',f'prefix = {prefix}',nml_dest) 
                 utils.write_log(print_prefix+'Run ungrib.exe: '+cmd)

@@ -10,6 +10,19 @@ from . import utils, const
 # ---Module regime consts and variables---
 print_prefix='lib.io>>'
 
+def zip_roms_his(tgt_path):
+    utils.write_log(f'{print_prefix}Zip {tgt_path}...')
+    file_list = os.listdir(tgt_path)
+    for filename in file_list:
+        if filename.startswith('roms_his_'):
+            utils.write_log(f'{print_prefix}Zip file {filename} in {tgt_path}...',30)
+            fnpart=filename.split('.')
+            srcfn=os.path.join(tgt_path, filename)
+            destfn=os.path.join(tgt_path, f'{fnpart[0]}.nc4')
+            os.system(f'nc3tonc4  {srcfn} {destfn}') 
+            os.remove(srcfn)
+
+   
 def hpc_quechck(chck_cmd, jobid):
     timer=30
     rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
@@ -20,7 +33,12 @@ def hpc_quechck(chck_cmd, jobid):
         rcode=subprocess.run(chck_cmd, shell=True, stdout=subprocess.PIPE)
         stdout=rcode.stdout.decode()
 
-    
+def check_filelist(filelist):
+    for file in filelist:
+        if not os.path.exists(file):
+            utils.write_log(f'{print_prefix}Missing {file}')
+            return False
+    return True 
 
 def check_mkdir(tgt_path):
     if not os.path.exists(tgt_path):
@@ -45,9 +63,9 @@ def symlink_files(src_path, dest_path):
 # ---Classes and Functions---
 def del_files(tgt_path, fnpatterns):
     file_list = os.listdir(tgt_path)
-    utils.write_log(f'{print_prefix}Clean workspace for {tgt_path}...')
     for filename in file_list:
         if filename.startswith(tuple(fnpatterns)):
+            utils.write_log(f'{print_prefix}Clean file {filename} in {tgt_path}...',30)
             os.remove(os.path.join(tgt_path, filename))
 
 def get_wrf_fn(tgt_time, wrf_domain):
@@ -86,8 +104,14 @@ def gen_roms_his_fnlst(drv_root, drv_dic, domid, tfs,ocn_nfrq):
         fn_lst.append(fn)
     return fn_lst, tfs
 def gen_patternfn_lst(drv_root, drv_dic, inittime, 
-        endtime, kw='atm',special=''):
-    
+        endtime, kw='atm',special='', include='left'):
+    '''
+    Magic Chars: $S, $F, $I, $A
+        $A: add hours, in %03d format
+        $I: init time to be replaced
+        $F: time frame to be replaced
+        $S: special string to be replaced 
+    '''
     fn_lst=[]
     # do not include the last time frame
     tfs=pd.date_range(start=inittime, end=endtime, 
@@ -99,16 +123,25 @@ def gen_patternfn_lst(drv_root, drv_dic, inittime,
         pattern=pattern.replace(f'$I{init_fmt}$I', init_str)
     if '$S' in pattern:
         pattern=pattern.replace(f'$S', special)
-        
-    frm_fmt=pattern.split('$F')[1]
-    for tf in tfs: 
-        frm_str = tf.strftime(frm_fmt)
-        # Replace the placeholders with the formatted strings
-        fn=pattern.replace(f'$F{frm_fmt}$F', frm_str)
-        fn_full=os.path.join(drv_root, fn)
-        if not(os.path.exists(fn_full)):
-            utils.throw_error(f'file not exist: {fn_full}')
-        fn_lst.append(fn_full)
+    
+    if '$A' in pattern:
+        for tf in tfs:
+            # Replace the placeholders with the formatted strings
+            dt=tf-inittime
+            fn=pattern.replace(f'$A', str(int(dt.total_seconds()/3600)).zfill(3))
+            fn_full=os.path.join(drv_root, fn)
+            fn_lst.append(fn_full)
+    elif '$F' in pattern:    
+        frm_fmt=pattern.split('$F')[1]
+        for tf in tfs: 
+            frm_str = tf.strftime(frm_fmt)
+            # Replace the placeholders with the formatted strings
+            fn=pattern.replace(f'$F{frm_fmt}$F', frm_str)
+            fn_full=os.path.join(drv_root, fn)
+            #if not(os.path.exists(fn_full)):
+            #    utils.throw_error(f'file not exist: {fn_full}')
+            fn_lst.append(fn_full)
+           
     return fn_lst, tfs
 def gen_roms_forc_template(ts, lat2d, lon2d):
     '''generate the forcing template file for ROMS

@@ -51,10 +51,30 @@ class SWANRocker:
         self.proj_root=uranus.proj_root
 
         self.wavfn_lst, self.file_time_series=io.gen_patternfn_lst(
-            self.drv_root, self.drv_dic, self.strt_time, self.end_time, kw='wav')
-    
-        self.mach_meta=self.uranus.machine_dic
+            self.drv_root, self.drv_dic, self.strt_time, self.end_time, 
+            kw='wav',include='both')
         
+        self.mach_meta=self.uranus.machine_dic
+        # sanity check
+        stat=io.check_filelist(self.wavfn_lst)
+        if not(stat):
+            if self.uranus.fcst_flag:
+                for buf_day in range(1,3):
+                    utils.write_log(
+                        f'{print_prefix}{self.drv_root} missing wav file(s), try {buf_day} days back', 30)
+                    buf_time=self.strt_time+datetime.timedelta(days=-buf_day)
+                    self.drv_root=utils.parse_fmt_timepath(buf_time, self.cfg['SWAN']['drv_root'])
+                    self.wavfn_lst, self.file_time_series=io.gen_patternfn_lst(
+                        self.drv_root, self.drv_dic, self.strt_time, self.end_time, kw='wav')
+                    stat=io.check_filelist(self.wavfn_lst)
+                    if stat:    
+                        break
+                if not(stat):
+                    utils.throw_error(f'{print_prefix}{self.drv_root} missing wav file(s)')
+            else:
+                utils.throw_error(f'{print_prefix}{self.drv_root} missing wav file(s)')
+        
+        utils.write_log(f'{print_prefix}SWANMaker Initiation Done.')
     def rock(self):
         """ build initial and boundary files for SWAN """
     

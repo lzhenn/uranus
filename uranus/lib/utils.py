@@ -36,12 +36,16 @@ def parse_init_time(tstr):
     try:
         ts=datetime.datetime.strptime(
             tstr,'%Y%m%d%H')
-    except:
-        if tstr.startswith('T-'):
-            num_days = int(tstr[2:])
+    except ValueError:
+        # e.g. T1_12
+        if tstr.startswith('T'):
+            str_part=tstr.split('_')
+            num_days = int(str_part[0][1:])
+            init_hh=int(str_part[1])
             today = datetime.datetime.today()
             today = today.replace(hour=0,minute=0,second=0,microsecond=0)
             ts=today - datetime.timedelta(days=num_days)
+            ts=ts + datetime.timedelta(hours=init_hh)
     return ts
 def parse_runspan(tstr):
     if tstr.endswith('D'):

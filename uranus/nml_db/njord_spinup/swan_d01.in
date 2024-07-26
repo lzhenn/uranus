@@ -12,27 +12,28 @@ NSGRIDS 1
 
 && KEYWORDS TO CREATE AND READ COMPUTATIONAL GRID &&
 CGRID CURVILINEAR 769 513 EXC 9.999000e+003 9.999000e+003 CIRCLE 36 0.04 1.0 24
-READGRID COORDINATES 1 'Projects/njord/swan_coord.grd' 4 0 0 FREE 
+READGRID COORDINATES 1 'Projects/njord_spinup/swan_coord_d01.grd' 4 0 0 FREE 
 
 && KEYWORDS TO CREATE AND READ BATHYMETRY GRID &&
 INPGRID BOTTOM CURVILINEAR 0 0 769 513 EXC 9.999000e+003
-READINP BOTTOM 1 'Projects/njord/swan_bathy.bot' 4 0 FREE 
+READINP BOTTOM 1 'Projects/njord_spinup/swan_bathy_d01.bot' 4 0 FREE 
 
 && KEYWORD TO CREATE CURRENT GRID &&
 INPGRID CURRENT CURVILINEAR 0 0 769 513 EXC 9.999000e+003 &
-       NONSTATIONARY ssyyyymmdd.hh0000 1 DAY eeyyyymmdd.hh0000
+       NONSTATIONARY ssyyyymmdd.hh0000 5 DAY eeyyyymmdd.hh0000
  
 && KEYWORD TO CREATE WATER LEVEL GRID &&
 INPGRID WLEV CURVILINEAR 0 0 769 513 EXC 9.999000e+003 &
-       NONSTATIONARY ssyyyymmdd.hh0000 1 DAY eeyyyymmdd.hh0000
+       NONSTATIONARY ssyyyymmdd.hh0000 5 DAY eeyyyymmdd.hh0000
 
 && KEYWORD TO CREATE WIND GRID &&
-INPGRID WIND REGULAR -6000 -6000 0 1 1 2000000. 2000000. &
-       NONSTATIONARY ssyyyymmdd.hh0000 1 DAY eeyyyymmdd.hh0000
+INPGRID WIND CURVILINEAR 0 0 769 513 EXC 9.999000e+003 & 
+    NONSTATIONARY ssyyyymmdd.hh0000 1 HR eeyyyymmdd.hh0000
+READINP WIND 1 'Projects/njord_spinup/swan_wind_d01.dat' 4 0 FREE 
 
 && KEYWORD TO CREATE BOTTOM FRIC GRID &&
 INPGRID FRIC CURVILINEAR 0 0 769 513 EXC 9.999000e+003 &
-       NONSTATIONARY ssyyyymmdd.hh0000 1 DAY eeyyyymmdd.hh0000
+       NONSTATIONARY ssyyyymmdd.hh0000 5 DAY eeyyyymmdd.hh0000
 
 & Boundary files  ****************************************
 
@@ -105,7 +106,7 @@ BOUNDSPEC SEGMENT XY 124.9480  24.0000 124.9480  24.0000 VARIABLE FILE 0 'swan_b
 
 
 & Restart name **********************************
-&INITIAL HOTSTART MULTIPLE 'swan_d01.hot'
+&INITIAL HOTSTART SINGLE 'swan_d01.hot'
 &INIT
 
 & PHYSICS  ****************************************
@@ -117,7 +118,7 @@ WCAP KOM 2.36E-5 3.02E-3 2.0 1.0 1.0
 PROP BSBT
 
 BLOCK 'COMPGRID' NOHEADER  'swan_his_hsig_d01.nc'    LAY 4 HSIGN 1.  OUTPUT ssyyyymmdd.hh0000 1 HR
-&BLOCK 'COMPGRID' NOHEADER  'hswell_d01.nc'    LAY 4 HSWELL 1.  OUTPUT ssyyyymmdd.hh0000 1 HR
+BLOCK 'COMPGRID' NOHEADER  'hswell_d01.nc'    LAY 4 HSWELL 1.  OUTPUT ssyyyymmdd.hh0000 1 HR
 &BLOCK 'COMPGRID' NOHEADER  'pdir_d01.nc'    LAY 4 PDIR 1.  OUTPUT ssyyyymmdd.hh0000 1 HR
 &BLOCK 'COMPGRID' NOHEADER  'tps_d01.nc'  LAY 4 TPS 1.   OUTPUT ssyyyymmdd.hh0000 1 HR
 

@@ -42,7 +42,7 @@
 !                                                                             !
 !    NFFILES == 6                          ! number of forcing files          !
 !                                                                             !
-!    FRCNAME == my_lwrad_year1.nc |                                           !
+!    FCNAME == my_lwrad_year1.nc |                                           !
 !               my_lwrad_year2.nc \                                           !
 !               my_swrad_year1.nc |                                           !
 !               my_swrad_year2.nc \                                           !
@@ -64,7 +64,7 @@
 !
 ! Application title.
 
-       TITLE = njord 
+       TITLE = njord_spinup 
 
 ! C-preprocessing Flag.
 
@@ -1002,7 +1002,7 @@ Dout(iTvdif) == F F     ! temp_vdiff, ...    vertical diffusion
 
 
      NBCFILES == 1                          ! number of boundary files
-!     BRYNAME ==Projects/Njord/ow_icbc/d01/merged_coawst_bdy.nc 
+     BRYNAME ==Projects/Njord/ow_icbc/d01/merged_coawst_bdy.nc 
 !     BRYNAME == Projects/Sandy/coawst_bdy_20121028.nc |
 !                Projects/Sandy/coawst_bdy_20121029.nc |
 !                Projects/Sandy/coawst_bdy_20121030.nc |
@@ -1040,7 +1040,7 @@ Dout(iTvdif) == F F     ! temp_vdiff, ...    vertical diffusion
 ! the last one.
 
      NFFILES == 1
-!     FRCNAME == Projects/Sandy/romsforc_NARR_Sandy2012.nc 
+     FRCNAME == Projects/Sandy/romsforc_NARR_Sandy2012.nc 
 !                Projects/Sandy/romsforc_NARR_Sandy2012.nc
 
 ! Output NetCDF file names, [1:Ngrids].

@@ -54,9 +54,15 @@ class Uranus:
         self.rock_roms=self.cfg['ROMS'].getboolean('rock_roms')
         self.rock_swan=self.cfg['SWAN'].getboolean('rock_swan')
         self.mode=cfg['uranus_mode']
+        # atm, ocn, wav
+        self.active_comp=const.MODE_FLAG_DIC[self.mode]
         self.nml_temp=cfg['nml_temp']
         self.domain_lv=cfg['domain_lv']
         self.sim_strt_time=utils.parse_init_time(cfg['model_init_ts'])
+        if cfg['model_init_ts'].startswith('T'):
+            self.fcst_flag=True
+        else:
+            self.fcst_flag=False
         self.run_hours=utils.parse_runspan(cfg['model_run_span'])
         self.sim_end_time=self.sim_strt_time+datetime.timedelta(hours=self.run_hours)
 
@@ -77,11 +83,7 @@ class Uranus:
         if self.mode=='shu':
             self.cplexe_root=self.cfg['WRF']['wrf_root']
         else:
-            if 'T-' in cfg['model_init_ts']:
-                self.machine_dic[f'{self.mode}_root']=self.machine_dic['opexe_root']
-                self.cplexe_root=self.machine_dic['opexe_root']
-            else:
-                self.cplexe_root=self.machine_dic[f'{self.mode}_root']
+            self.cplexe_root=self.machine_dic[f'{self.mode}_root']
         
         self.proj_root=os.path.join(
             self.cplexe_root,'Projects',self.nml_temp)
@@ -95,7 +97,23 @@ class Uranus:
         
         self.arch_flag=cfg.getboolean('archive_flag')
         self.arch_root=utils.parse_fmt_timepath(self.sim_strt_time, cfg['arch_root'])
+        # copy config file 
+        cfgfn=os.path.join(
+        self.cfgdb_root, self.nml_temp, '*in')
+        io.copy_files(cfgfn, self.proj_root)
         utils.write_log('Uranus Initiation Done.')
+
+    def spinup_prep(self):
+        pass
+    def waterfall(self):
+        '''
+        waterfall the main stream 
+        '''
+        self.makewrf()
+        self.makeroms()
+        self.makeswan()
+        self.cplrock()
+ 
     def update_machine_dic(self):
         try:
             spec=const.NML_SPECIFIC[self.nml_temp]
@@ -108,12 +126,7 @@ class Uranus:
         except KeyError:
             pass
  
-    def waterfall(self):
-        self.makewrf()
-        self.makeroms()
-        self.makeswan()
-        self.cplrock()
-    
+   
     def makewrf(self):
         from .lib import wrf_rocker
         if self.rock_wrf:
@@ -124,7 +137,7 @@ class Uranus:
         from.lib import roms_rocker
         if self.rock_roms:
             self.romsmaker=roms_rocker.ROMSRocker(self)
-            
+            self.romsmaker.rock() 
     def makeswan(self):
         from .lib import swan_rocker
         if self.rock_swan:
@@ -136,9 +149,7 @@ class Uranus:
             cfg=self.cfg
             domlv=self.domain_lv
             # copy files
-            cfgfn=os.path.join(
-                self.cfgdb_root, self.nml_temp, '*in')
-            io.copy_files(cfgfn, self.proj_root)
+          
             domfn=os.path.join(
                 self.domdb_root, self.nml_temp, 'scrip*')
             io.symlink_files(domfn, self.proj_root)
@@ -166,6 +177,7 @@ class Uranus:
             
             # roms flow
             self.romsmaker.prepare_cplrock()
+            # swan flow
             self.swanmaker.prepare_cplrock()
             # run coawstM
             # special for cmme
@@ -210,12 +222,20 @@ class Uranus:
     
     def archive_data(self):
         io.check_mkdir(self.arch_root)
+        # mv files
         file_patterns=['wrf[o,r,x]*','roms_his*','swan_his*']
         for itm in file_patterns:
             cmd=f'mv {os.path.join(self.cplexe_root,itm)} {self.arch_root}'
             utils.write_log(print_prefix+'Archive: '+cmd)
             rcode=subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
-        
+        # cp files
+        file_patterns=['namelist.input']
+        for itm in file_patterns:
+            wrf_nml=os.path.join(self.cplexe_root,itm)
+            io.copy_files(wrf_nml, self.arch_root)
+            
+        if self.active_comp[1]==1:
+            io.zip_roms_his(self.arch_root) 
         #for itm in file_patterns:
         #    io.move_files(os.path.join(self.cplexe_root,itm), self.arch_root)
     def _setup_logging(self):

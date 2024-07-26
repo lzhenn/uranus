@@ -29,10 +29,19 @@ class ROMSRocker:
             utils.write_log(print_prefix+'no version in cfg, use 3.8')
         romscfg=self.cfg['ROMS']
         self.gen_icbc=romscfg.getboolean('gen_roms_icbc')
-        self.down_drv=romscfg.getboolean('down_drv')
+        self.down_drv=romscfg.getboolean('down_drv_data')
         self.restart_run=romscfg.getboolean('restart_run')
         self.strt_time,self.end_time=uranus.sim_strt_time,uranus.sim_end_time
         self.domid=uranus.domain_lv 
+        try:
+            self.pseudo_init=True
+            self.pseudo_init_time=utils.parse_init_time(romscfg['pseudo_init_ts'])
+            self.pseudo_delta=self.pseudo_init_time-self.strt_time
+            self.pseudo_end_time=self.pseudo_init_time+datetime.timedelta(hours=uranus.run_hours)
+        except KeyError:
+            self.pseudo_delta=self.strt_time-self.strt_time
+            pass
+        
         time_offset=self.strt_time - const.BASE_TIME
         self.dstart=time_offset.total_seconds()/const.DAY_IN_SEC
 
@@ -52,6 +61,9 @@ class ROMSRocker:
         self.dt=int(romscfg['dt'])
         self.nrst=int(romscfg['nrst'])
         self.nhis=int(romscfg['nhis'])
+        utils.write_log(f'{print_prefix}ROMSMaker Initiation Done.')
+    
+    def build_meta(self):
         # build meta
         self.frm_time_series=pd.date_range(
             start=self.strt_time, end=self.end_time, freq=self.drv_dic['ocn_nfrq'])
@@ -65,16 +77,44 @@ class ROMSRocker:
             self.ocnfn_lst, self.file_time_series=io.gen_roms_his_fnlst(
                 self.drv_root, self.drv_dic, bdydomid, self.frm_time_series, self.ocn_nfrq)
         else:
-            self.ocnfn_lst, self.file_time_series=io.gen_patternfn_lst(
-                self.drv_root, self.drv_dic, self.strt_time, self.end_time, kw='ocn')
-    
+            # paeudo init for cases before the reanalysis covered
+            if self.pseudo_init:
+                self.ocnfn_lst, self.file_time_series=io.gen_patternfn_lst(
+                    self.drv_root, self.drv_dic, 
+                    self.pseudo_init_time, self.pseudo_end_time, kw='ocn')
+            else:
+                self.ocnfn_lst, self.file_time_series=io.gen_patternfn_lst(
+                    self.drv_root, self.drv_dic, self.strt_time, self.end_time, kw='ocn')
+        # sanity check
+        stat=io.check_filelist(self.ocnfn_lst)
+        
+        if not(stat):
+            if self.uranus.fcst_flag:
+                for buf_day in range(1,3):
+                    utils.write_log(
+                        f'{print_prefix}{self.drv_root} missing ocn file(s), try {buf_day} days back', 30)
+                    buf_time=self.strt_time+datetime.timedelta(days=-buf_day)
+                    self.drv_root=utils.parse_fmt_timepath(buf_time, self.cfg['ROMS']['drv_root'])
+                    self.ocnfn_lst, self.file_time_series=io.gen_patternfn_lst(
+                        self.drv_root, self.drv_dic, self.strt_time, self.end_time, kw='ocn')
+                    stat=io.check_filelist(self.ocnfn_lst)
+                    if stat:    
+                        break
+                if not(stat):
+                    utils.throw_error(f'{print_prefix}{self.drv_root} missing ocn file(s)')
+            else:
+                utils.throw_error(f'{print_prefix}{self.drv_root} missing ocn file(s)')
     def rock(self):
         if self.gen_icbc:
         # down driven data 
             if self.down_drv:
                 self.downdrv()
+            self.build_meta()
             self.build_forc() 
             self.build_icbc() 
+    def downdrv(self):
+        if self.down_drv:
+            self.uranus.crawler.down_ocn()
     def prepare_cplrock(self):
         nml_temp=self.uranus.nml_temp
         
@@ -125,23 +165,22 @@ class ROMSRocker:
         bryname=os.path.join(proj_reldir, f'roms_bdy_{self.domid}.nc')
         frcname=os.path.join(proj_reldir, f'roms_forc_{self.domid}.nc') 
         
-        tf_start=self.file_time_series[0]       
-        tf_str=tf_start.strftime('%Y%m%d')
+        #tf_start=self.strt_time       
+        #tf_str=tf_start.strftime('%Y%m%d')
         sed_dic={
             'NtileI':self.uranus.ntasks_iocn, 'NtileJ':self.uranus.ntasks_jocn,
             'NTIMES':ntimes, 'DT':f"{self.dt:.1f}d0", 'NRST':nrst, 'NRREC':nrrec,
             'NHIS':nhis, 
             'NDEFHIS':ndefhis, 'NDIA':nhis, #'NAVG':nhis, 
             'GRDNAME':grdname, 'ININAME':ininame, 'CLMNAME':clmname, 'BRYNAME':bryname,
-            'FRCNAME':frcname,
             'DSTART':f'{self.dstart:.3f}d0',
             #'TIME_REF':f"{tf_str}.0d0"
         }
+        if self.uranus.active_comp[0]==0:
+            sed_dic['FRCNAME']=frcname
         for key, itm in sed_dic.items():
             utils.sedline(key, f'{key} == {itm}', roms_in, count=1)
-    def downdrv(self):
-        if self.down_drv:
-            self.uranus.crawler.down_ocn()
+
     
     def load_domain(self):
         """ load domain file """
@@ -230,6 +269,7 @@ class ROMSRocker:
             print_prefix+'build icbcs from %s to %s...'%(
                 self.strt_time.strftime('%Y%m%d%H'),self.end_time.strftime('%Y%m%d%H')))
         
+        io.del_files(self.proj_root, const.ROMS_CLEAN_LIST)
         # load domain file
         self.load_domain()
         
@@ -245,8 +285,7 @@ class ROMSRocker:
         for it, tf in enumerate(self.frm_time_series):
             utils.write_log(
                 print_prefix+'build icbcs@%s...'% tf.strftime('%Y%m%d%H%M'))
-
-            if tf in self.file_time_series:
+            if tf+self.pseudo_delta in self.file_time_series:
                 # load raw file  
                 self.load_raw(it) 
             if self.drv_type=='roms':
@@ -254,12 +293,15 @@ class ROMSRocker:
             else:
                 # first deal with zeta
                 roms_var='zeta'
+                '''
                 if self.drv_type=='cfs':
                     utils.write_log(
                         print_prefix+'cfs data set zeta=0...')
                     self.ds_smp['zeta'].values[:]=0.0
                 else:
                     self.inter2d(roms_var)
+                '''
+                self.ds_smp['zeta'].values[:]=0.0
                 # calculate vertical coordinate before 3d interpolation
                 zeta = self.ds_smp['zeta'] 
                 h=zeta # obtain dimensional information of zeta  
@@ -508,12 +550,15 @@ class ROMSRocker:
         for var in const.CLM_TIME_VAR:
             var_time=ds_clm[var+'_time']
             # pkg time
+            var_time.values[:]=int(time_offset.total_seconds())*const.S2NS
+            '''
             if self.version=='3.5':
-                var_time.values[:]=int(time_offset.total_seconds()-1)*const.S2NS
+                var_time.values[:]=int(time_offset.total_seconds())*const.S2NS
+                #var_time.values[:]=int(time_offset.total_seconds()-1)*const.S2NS
             else:
                 var_time.values[:]=int(time_offset.total_seconds())*const.S2NS
             #ds_clm=ds_clm.assign_coords({var:var_time})
-        
+            '''
         clmfn=os.path.join(
             self.proj_root,f'roms_clm_{self.domid}_%s.nc'% time_frm.strftime('%Y%m%d%H%M'))
         self.clm_fnlst.append(clmfn)
@@ -560,11 +605,14 @@ class ROMSRocker:
         # deal with time vars 
         for var in const.BDY_TIME_VAR:
             var_time=ds_bdy[var+'_time']
+            var_time.values[:]=int(time_offset.total_seconds())*const.S2NS
+            '''
             if self.version=='3.5':
                 var_time.values[:]=int(time_offset.total_seconds())*const.S2NS
                 #var_time.values[:]=int(time_offset.total_seconds()-1)*const.S2NS
             else:
                 var_time.values[:]=int(time_offset.total_seconds())*const.S2NS
+            '''
             #ds_bdy=ds_bdy.assign_coords({var:var_time})
         bdyfn=os.path.join(
             self.proj_root,f'roms_bdy_{self.domid}_%s.nc'% time_frm.strftime('%Y%m%d%H%M'))
