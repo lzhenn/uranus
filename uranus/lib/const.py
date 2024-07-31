@@ -33,7 +33,7 @@ MACHINE_DIC={
         'domdb_root':'/home/lzhenn/array74/Njord_Calypso/domaindb/'
     },
     'hqlx130':{
-        'bashrc':'/home/lzhenn/.bashrc_intel20_amd',
+        'bashrc':'/home/lzhenn/.bashrc_oneapi_amd',
         'mpicmd':'mpirun', 'corespernode':128, 'nodes':1,
         'metgrid_np':16, 'real_np':16, 'wrf_np':32,
         'njord_root':'/home/lzhenn/array130/COAWST_Njord',
@@ -143,7 +143,7 @@ DRV_DIC={
     'hycom_roms':{
         'ocn_nfrq':'24H','ocn_file_nfrq':'1D',
         'ocn_naming_pattern':'hycom_$F%Y%m%d%H$F.nc'},
-    'roms_roms':{'ocn_naming_pattern':'roms_his_domid_%05d.nc4'},
+    'roms_roms':{'ocn_naming_pattern':'roms_his_domid_%05d.nc'},
     # SWAN
     'era5_swan':{'wav_naming_pattern':'$F%Y%m%d$F-wv.grib', 'wav_nfrq':'3H', 'wav_file_nfrq':'1D','frm_per_file':8}, 
     'era5mon_swan':{'wav_naming_pattern':'$F%Y%m$F-sl.grib', 'wav_nfrq':'3H', 'wav_file_nfrq':'1M','frm_per_file':240}, 

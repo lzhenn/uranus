@@ -127,6 +127,8 @@ BLOCK 'COMPGRID' NOHEADER  'swan_his_hsig_d01.nc'    LAY 4 HSIGN 1.  OUTPUT ssyy
 &SPEC 'SITE' SPEC2D ABS 'swan_spec_yangjiang.ascii' OUTPUT ssyyyymmdd.hh0000 1 HR
 NGRID 'd02bdy' 112.475 21.483 0 2.502 1.5018 40 24
 NESTOUT 'd02bdy' 'swan_bdy_d02.dat' OUTPUT 1 1 HR
+NGRID 'd03bdy' 113.823 22.116 0 0.658 0.507 52 40
+NESTOUT 'd03bdy' 'swan_bdy_d03.dat' OUTPUT 1 15 MIN
 
 &RESTART 'swan_rst_d01.dat' FREE 24 HR
 

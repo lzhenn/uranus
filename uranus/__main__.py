@@ -234,8 +234,8 @@ class Uranus:
             wrf_nml=os.path.join(self.cplexe_root,itm)
             io.copy_files(wrf_nml, self.arch_root)
             
-        if self.active_comp[1]==1:
-            io.zip_roms_his(self.arch_root) 
+        #if self.active_comp[1]==1:
+        #    io.zip_roms_his(self.arch_root) 
         #for itm in file_patterns:
         #    io.move_files(os.path.join(self.cplexe_root,itm), self.arch_root)
     def _setup_logging(self):

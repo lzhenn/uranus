@@ -308,7 +308,9 @@ class WRFRocker:
         self.ds=xr.open_dataset(fn_lst[idx]) 
         if idx==0 and self.drv_dic['vcoord']=='sigmap':
             aname,bname=self.drv_dic['acoef'],self.drv_dic['bcoef']
-            self.ap=self.ds[aname].values
+            acoef=self.ds[aname].values
+            p0=self.ds[self.drv_dic['p0name']].values
+            self.ap=acoef*p0
             self.b=self.ds[bname].values
         if self.drv_type in ['cpsv3','bcmm']:
             self.ds_lnd=xr.open_dataset(self.lndfn_lst[idx])

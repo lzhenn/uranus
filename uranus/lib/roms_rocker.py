@@ -73,7 +73,7 @@ class ROMSRocker:
             if self.domid=='d02':
                 bdydomid='d01'
             elif self.domid=='d03':
-                bdydomid='d02'
+                bdydomid='d01'
             self.ocnfn_lst, self.file_time_series=io.gen_roms_his_fnlst(
                 self.drv_root, self.drv_dic, bdydomid, self.frm_time_series, self.ocn_nfrq)
         else:
@@ -268,8 +268,8 @@ class ROMSRocker:
         utils.write_log(
             print_prefix+'build icbcs from %s to %s...'%(
                 self.strt_time.strftime('%Y%m%d%H'),self.end_time.strftime('%Y%m%d%H')))
-        
-        io.del_files(self.proj_root, const.ROMS_CLEAN_LIST)
+        cln_lst=[ele+self.domid for ele in const.ROMS_CLEAN_LIST] 
+        io.del_files(self.proj_root, cln_lst)
         # load domain file
         self.load_domain()
         
