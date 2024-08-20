@@ -36,9 +36,8 @@ class WRFRocker:
         resource_path = os.path.join('db', self.drv_type+'.csv')
         if not(self.drv_dic['use_ungrib']):
             self.df_meta=pd.read_csv(utils.fetch_pkgdata(resource_path))
- 
-        
-        utils.write_log(f'{print_prefix}WRFMaker Initiation Done.')
+        if 'nml_modification' in wrfcfg:
+            self.nml_mod=wrfcfg['nml_modification']
     def rock(self):
         self.preprocess()
         if self.run_ungrib:
@@ -90,7 +89,13 @@ class WRFRocker:
             sed_dic={
                 'run_hours':sim_hrs, 'interval_seconds':interval,
                 'num_metgrid_soil_levels':nsoil, 'num_metgrid_levels':nplv,}
+            if hasattr(self, 'nml_mod'):
+                mod_pairs=self.nml_mod.split('|') 
+                for pair in mod_pairs:
+                    key, val=pair.split(':')
+                    sed_dic[key]=val
             for key, itm in sed_dic.items():
+                utils.write_log(f'{print_prefix}namelist.input: {key} = {itm}')
                 utils.sedline(key, f'{key} = {itm}',nml_dest)
             
             utils.sed_wrf_timeline('start_year',start_time,nml_dest,fmt='%Y')
@@ -145,7 +150,7 @@ class WRFRocker:
                 rcode=subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
         else:
             utils.write_log(
-                f'{self.drv_type} use struct BYTEFLOW toolkit to generate wrf interim files')
+                f'{print_prefix}{self.drv_type} use struct BYTEFLOW toolkit to generate wrf interim files')
             self._build_meta()
             self._gen_interim()
     def metgrid(self):

@@ -6,6 +6,5 @@ YR=$3
 DAYS=$4
 SSP=$5
 HOST=hqlx$ID
-CTRL=/home/lzhenn/array74/workspace/uranus/case_ctrler
-
+CTRL=`pwd`
 ssh $HOST "conda activate uranus-test;cd ${CTRL};python cmip6_wrf_new.py -m ${ID} -p ${PID} -y ${YR} -d ${DAYS} -s ${SSP}"

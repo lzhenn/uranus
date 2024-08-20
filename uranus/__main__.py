@@ -231,10 +231,16 @@ class Uranus:
         # cp files
         file_patterns=['namelist.input']
         for itm in file_patterns:
-            wrf_nml=os.path.join(self.cplexe_root,itm)
-            io.copy_files(wrf_nml, self.arch_root)
-            
-        #if self.active_comp[1]==1:
+            tgt_fn=os.path.join(self.cplexe_root,itm)
+            io.copy_files(tgt_fn, self.arch_root)
+            tgt_fn=os.path.join(self.arch_root,itm)
+            # Get the current file permissions
+            current_permissions = os.stat(tgt_fn).st_mode
+            # Add read permission for user group and others
+            new_permissions = current_permissions | 0o444
+            # Set the new permissions
+            os.chmod(tgt_fn, new_permissions) 
+                 #if self.active_comp[1]==1:
         #    io.zip_roms_his(self.arch_root) 
         #for itm in file_patterns:
         #    io.move_files(os.path.join(self.cplexe_root,itm), self.arch_root)

@@ -33,15 +33,14 @@ class ROMSRocker:
         self.restart_run=romscfg.getboolean('restart_run')
         self.strt_time,self.end_time=uranus.sim_strt_time,uranus.sim_end_time
         self.domid=uranus.domain_lv 
-        try:
+        if 'pseudo_init_ts' in romscfg:
             self.pseudo_init=True
             self.pseudo_init_time=utils.parse_init_time(romscfg['pseudo_init_ts'])
             self.pseudo_delta=self.pseudo_init_time-self.strt_time
             self.pseudo_end_time=self.pseudo_init_time+datetime.timedelta(hours=uranus.run_hours)
-        except KeyError:
-            self.pseudo_delta=self.strt_time-self.strt_time
-            pass
-        
+        else:
+            self.pseudo_init=False
+            self.pseudo_delta=datetime.timedelta(0)
         time_offset=self.strt_time - const.BASE_TIME
         self.dstart=time_offset.total_seconds()/const.DAY_IN_SEC
 
@@ -51,6 +50,17 @@ class ROMSRocker:
         self.surf_frq=romscfg['surf_frq']
         self.surf_wrfdom=romscfg['wrf_match']
         self.surf_root=utils.parse_fmt_timepath(self.strt_time, romscfg['surf_root'])
+        
+        if self.cfg.has_section(uranus.mode):
+            if self.cfg.has_option(uranus.mode, 'tc_intense_factor'):
+                self.tc_intense_factor=self.cfg.getfloat(uranus.mode, 'tc_intense_factor')
+                utils.write_log(f'{print_prefix}TC INTENSIFICATION TURNED ON, factor={self.tc_intense_factor:.2f}')
+                try:
+                    self.sim_trck=pd.read_csv(
+                        f'{self.surf_root}/tc_track.csv', parse_dates=['time'],index_col=['time'])
+                    utils.write_log(f'{print_prefix}TC INTENSIFICATION TRACK LOADED')
+                except FileNotFoundError:
+                    utils.throw_error(f'{self.surf_root}/tc_track.csv not found')
         self.drv_dic=const.DRV_DIC[self.drv_type+'_roms']
         if self.drv_type=='roms':
             self.drv_dic['ocn_nfrq']=romscfg['drv_frq']
@@ -58,7 +68,7 @@ class ROMSRocker:
         self.drv_root=utils.parse_fmt_timepath(self.strt_time, romscfg['drv_root'])
         self.proj_root=uranus.proj_root
         self.domdb_root=uranus.domdb_root
-        self.dt=int(romscfg['dt'])
+        self.dt=float(romscfg['dt'])
         self.nrst=int(romscfg['nrst'])
         self.nhis=int(romscfg['nhis'])
         utils.write_log(f'{print_prefix}ROMSMaker Initiation Done.')
@@ -244,6 +254,17 @@ class ROMSRocker:
                 utils.write_log(print_prefix+'Read surface forcing from '+surf_file)
                 surf_file=os.path.join(surf_dir,surf_file)
                 wrf_hdl=nc4.Dataset(surf_file)
+                
+                if hasattr(self, 'sim_trck'):
+                    try:
+                        curr_loc=self.sim_trck.index.get_loc(curr_time) 
+                        curr_rec=self.sim_trck.iloc[curr_loc]
+                        utils.write_log(
+                            print_prefix+f'TC_INTENSIFY: TC centered at lat:{curr_rec["lat"]:.3f}, lon:{curr_rec["lon"]:.3f}')
+                    except KeyError:
+                        utils.write_log(
+                            print_prefix+'TC_INTENSIFY: NO TC record for '+curr_time.strftime('%Y%m%d%H'))
+                        pass 
                 for roms_var, wrf_var in const.ROMS_WRF_FORC_MAPS.items():
                     if roms_var=='Tair':
                         temp_var = wrf.getvar(
@@ -258,6 +279,14 @@ class ROMSRocker:
                         temp_var = wrf.getvar(
                             wrf_hdl, wrf_var,
                             timeidx=wrf.ALL_TIMES, method="cat")
+                    if ('curr_rec' in locals()) and (roms_var=='Uwind' or roms_var=='Vwind'):
+                        utils.write_log(
+                            print_prefix+f'TC_INTENSIFY: {roms_var} orginal range: {temp_var.min().values:.2f}, {temp_var.max().values:.2f}')
+                        temp_var=mathlib.intensify_tc(
+                            self.tc_intense_factor, temp_var,
+                            curr_rec['lat'], curr_rec['lon'])
+                        utils.write_log(
+                            print_prefix+f'TC_INTENSIFY: {roms_var} intensified range: {temp_var.min().values:.2f}, {temp_var.max().values:.2f}')
                     ds_forc[roms_var].values[idx,:,:]=temp_var.values
                 wrf_hdl.close()
         forc_fn=os.path.join(

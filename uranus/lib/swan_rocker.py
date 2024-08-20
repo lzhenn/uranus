@@ -7,7 +7,7 @@ import numpy as np
 import re
 import netCDF4 as nc4
 import wrf
-from . import utils, io, const, cfgparser
+from . import utils, io, const, mathlib
 
 # ---Module regime consts and variables---
 print_prefix='lib.SWANRocker>>'
@@ -48,6 +48,18 @@ class SWANRocker:
         self.drv_dic=const.DRV_DIC[self.drv_type+'_swan']
         self.drv_root=utils.parse_fmt_timepath(
             self.strt_time, swancfg['drv_root'])
+        
+        if self.cfg.has_section(uranus.mode):
+            if self.cfg.has_option(uranus.mode, 'tc_intense_factor'):
+                self.tc_intense_factor=self.cfg.getfloat(uranus.mode, 'tc_intense_factor')
+                utils.write_log(f'{print_prefix}TC INTENSIFICATION TURNED ON, factor={self.tc_intense_factor:.2f}')
+                try:
+                    self.sim_trck=pd.read_csv(
+                        f'{self.wrf_dir}/tc_track.csv', parse_dates=['time'],index_col=['time'])
+                    utils.write_log(f'{print_prefix}TC INTENSIFICATION TRACK LOADED')
+                except FileNotFoundError:
+                    utils.throw_error(f'{self.wrf_dir}/tc_track.csv not found')
+        
         self.proj_root=uranus.proj_root
 
         self.wavfn_lst, self.file_time_series=io.gen_patternfn_lst(
@@ -344,6 +356,27 @@ class SWANRocker:
             utils.write_log(print_prefix+'Query Wind Timestamp:'+str(curr_time))
             u10_tmp=wrf_u10
             v10_tmp=wrf_v10
+            
+            # TC intensification
+            if hasattr(self, 'sim_trck'):
+                try:
+                    curr_loc=self.sim_trck.index.get_loc(curr_time) 
+                    curr_rec=self.sim_trck.iloc[curr_loc]
+                    utils.write_log(
+                        print_prefix+f'TC_INTENSIFY: TC centered at lat:{curr_rec["lat"]:.3f}, lon:{curr_rec["lon"]:.3f}')
+                except KeyError:
+                    utils.write_log(
+                        print_prefix+'TC_INTENSIFY: NO TC record for '+curr_time.strftime('%Y%m%d%H'))
+                    pass 
+            if ('curr_rec' in locals()):
+                utils.write_log(
+                    print_prefix+f'TC_INTENSIFY: U10 orginal range: {u10_tmp.min().values:.2f}, {u10_tmp.max().values:.2f}')
+                u10_tmp=mathlib.intensify_tc(
+                    self.tc_intense_factor, u10_tmp, curr_rec['lat'], curr_rec['lon'])
+                v10_tmp=mathlib.intensify_tc(
+                    self.tc_intense_factor, v10_tmp, curr_rec['lat'], curr_rec['lon'])
+                utils.write_log(
+                    print_prefix+f'TC_INTENSIFY: U10 intensified range: {u10_tmp.min().values:.2f}, {u10_tmp.max().values:.2f}')
 
             swan_u = interp_wrf2swan(u10_tmp, lat_swan, lon_swan)
             swan_v = interp_wrf2swan(v10_tmp, lat_swan, lon_swan)

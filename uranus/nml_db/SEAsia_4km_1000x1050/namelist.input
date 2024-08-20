@@ -74,6 +74,7 @@
  /
 
  &physics
+ ! WSM6 -- 6; New Thompson -- 8
  mp_physics                          = 8,     3,    3,  3,
  ra_lw_physics                       = 4,     4,    4,  4,
  ra_sw_physics                       = 4,     4,    4,  4,

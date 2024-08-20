@@ -53,6 +53,16 @@ MACHINE_DIC={
         'cfgdb_root':'/home/lzhenn/array74/workspace/uranus/uranus/nml_db/',
         'domdb_root':'/home/lzhenn/array74/Njord_Calypso/domaindb/'
     },
+    'hqlx182':{ # SEA test environment
+        'bashrc':'/home/lzhenn/.bashrc_intel20_amd',
+        'mpicmd':'mpirun', 'corespernode':192, 'nodes':1,
+        'metgrid_np':96, 'real_np':96, 'wrf_np':192,
+        'njord_root':'/home/lzhenn/array181/op_njord/model/COAWST_Njord/',
+        'poseidon_root':'/home/lzhenn/array181/op_njord/model/COAWST_Poseidon',
+        'opexe_root':'/home/lzhenn/array181/op_njord/model/COAWST_Njord/',
+        'cfgdb_root':'/home/lzhenn/array74/workspace/uranus/uranus/nml_db/',
+        'domdb_root':'/home/lzhenn/array74/Njord_Calypso/domaindb/'
+    },
     'hqlx86':{
         'bashrc':'/home/metctm1/.bashrc_i20_cwst38',
         'mpicmd':'mpirun', 'corespernode':48, 'nodes':1,
@@ -83,7 +93,7 @@ MACHINE_DIC={
 }
 for itm in [
     '47','54','62','65','69','129',
-    '133','132','111','100','174','179','182']:
+    '133','132','111','100','174','179']:
     MACHINE_DIC['hqlx'+itm]=MACHINE_DIC['hqlx74']
 
 NML_SPECIFIC={
@@ -124,6 +134,12 @@ DRV_DIC={
         'Vtable':'Vtable.ERA-interim.pl','ungrib_prefixes':['ERASL','ERAPL'],
         'fg_name':"'ERASL','ERAPL'",
         'file_patterns':['%Y%m*-sl.grib','%Y%m*-pl.grib'],
+    },
+    'era5addpl_wrf':{
+        'use_ungrib':True,'atm_nfrq':'3H','nsoil':4,'plv':'PL31',
+        'Vtable':'Vtable.ERA-interim.pl','ungrib_prefixes':['ERASL','ERAPL','ERAADDPL'],
+        'fg_name':"'ERASL','ERAPL','ERAADDPL'",
+        'file_patterns':['%Y%m*-sl.grib','%Y%m*-pl.grib','%Y%m*-addpl.grib'],
     },
     'gfs_wrf':{
         'use_ungrib':True,'atm_nfrq':'3H','nsoil':4,'plv':'PL33',

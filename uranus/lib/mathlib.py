@@ -1,6 +1,16 @@
 import numpy as np
 from . import utils, const
 
+def intensify_tc(fc, da, lat0, lon0, radius=500):
+    xlat,xlon=da['XLAT'].values,da['XLONG'].values
+    mask=gen_square_mask(xlat, xlon, lat0, lon0, radius, fc)
+    da.values=da.values*mask
+    return da
+def gen_square_mask(xlat, xlon, lat0, lon0, radius, fc):
+    mask=np.ones(xlat.shape)
+    r2dr=radius/111.12
+    mask[(xlat>=lat0-r2dr) & (xlat<=lat0+r2dr) & (xlon>=lon0-r2dr) & (xlon<=lon0+r2dr)]=fc
+    return mask
 def sigma2depth(zeta,h,ds_smp):
         
     # S-coordinate parameter, critical depth
