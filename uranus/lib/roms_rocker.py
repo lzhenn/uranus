@@ -45,6 +45,15 @@ class ROMSRocker:
         self.dstart=time_offset.total_seconds()/const.DAY_IN_SEC
 
         self.drv_type=romscfg['drv_type']
+        if 'roms' in self.drv_type:
+            self.drv_type=self.drv_type.split(':')[0]
+            try: 
+                self.bdydomid=self.drv_type.split(':')[1]
+            except IndexError:
+                self.bdydomid='d01'
+            if not('d0' in self.bdydomid):
+                utils.throw_error(f'{print_prefix}invalid domid for roms drv_type: {self.drv_type}, usage e.g. roms:d03')
+ 
         self.gen_surf=romscfg.getboolean('gen_surf')
         self.surf_type=romscfg['surf_type']
         self.surf_frq=romscfg['surf_frq']
@@ -54,7 +63,7 @@ class ROMSRocker:
         if self.cfg.has_section(uranus.mode):
             if self.cfg.has_option(uranus.mode, 'tc_intense_factor'):
                 self.tc_intense_factor=self.cfg.getfloat(uranus.mode, 'tc_intense_factor')
-                utils.write_log(f'{print_prefix}TC INTENSIFICATION TURNED ON, factor={self.tc_intense_factor:.2f}')
+                utils.write_log(f'{print_prefix}TC INTENSIFICATION TURNED ON, factor={self.tc_intense_factor:.2f},30')
                 try:
                     self.sim_trck=pd.read_csv(
                         f'{self.surf_root}/tc_track.csv', parse_dates=['time'],index_col=['time'])
@@ -69,8 +78,11 @@ class ROMSRocker:
         self.proj_root=uranus.proj_root
         self.domdb_root=uranus.domdb_root
         self.dt=float(romscfg['dt'])
-        self.nrst=int(romscfg['nrst'])
+        self.nrst=romscfg['nrst']
         self.nhis=int(romscfg['nhis'])
+        if 'nml_modification' in romscfg:
+            self.nml_mod=romscfg['nml_modification']
+ 
         utils.write_log(f'{print_prefix}ROMSMaker Initiation Done.')
     
     def build_meta(self):
@@ -80,12 +92,8 @@ class ROMSRocker:
         if len(self.frm_time_series)>1:
             self.ocn_nfrq=int((self.frm_time_series[1]-self.frm_time_series[0]).total_seconds())
         if self.drv_type=='roms':
-            if self.domid=='d02':
-                bdydomid='d01'
-            elif self.domid=='d03':
-                bdydomid='d01'
             self.ocnfn_lst, self.file_time_series=io.gen_roms_his_fnlst(
-                self.drv_root, self.drv_dic, bdydomid, self.frm_time_series, self.ocn_nfrq)
+                self.drv_root, self.drv_dic, self.bdydomid, self.frm_time_series, self.ocn_nfrq)
         else:
             # paeudo init for cases before the reanalysis covered
             if self.pseudo_init:
@@ -120,8 +128,8 @@ class ROMSRocker:
             if self.down_drv:
                 self.downdrv()
             self.build_meta()
-            self.build_forc() 
             self.build_icbc() 
+        self.build_forc() 
     def downdrv(self):
         if self.down_drv:
             self.uranus.crawler.down_ocn()
@@ -136,7 +144,17 @@ class ROMSRocker:
         roms_in=os.path.join(self.proj_root, f'roms_{self.domid}.in')
         run_seconds=int((self.end_time-self.strt_time).total_seconds())
         ntimes=run_seconds//self.dt
-        nrst=self.nrst*const.DAY_IN_SEC//self.dt
+        if self.nrst.endswith('D'):
+            nrst=int(self.nrst[:-1])
+            nrst=nrst*const.DAY_IN_SEC//self.dt
+        elif self.nrst.endswith('H'):
+            nrst=int(self.nrst[:-1])
+            nrst=nrst*const.HR_IN_SEC//self.dt
+        elif self.nrst.endswith('M'):
+            nrst=int(self.nrst[:-1])
+            nrst=nrst*const.MIN_IN_SEC//self.dt
+        else:
+            utils.throw_error(f'{print_prefix}unknown nrst {self.nrst}, usage e.g. 30M, 6H, 1D')
         nhis=self.nhis*const.MIN_IN_SEC//self.dt 
         # only use half day
         ndefhis=nhis
@@ -179,7 +197,7 @@ class ROMSRocker:
         #tf_str=tf_start.strftime('%Y%m%d')
         sed_dic={
             'NtileI':self.uranus.ntasks_iocn, 'NtileJ':self.uranus.ntasks_jocn,
-            'NTIMES':ntimes, 'DT':f"{self.dt:.1f}d0", 'NRST':nrst, 'NRREC':nrrec,
+            'NTIMES':ntimes, 'DT':f"{self.dt:.2f}d0", 'NRST':nrst, 'NRREC':nrrec,
             'NHIS':nhis, 
             'NDEFHIS':ndefhis, 'NDIA':nhis, #'NAVG':nhis, 
             'GRDNAME':grdname, 'ININAME':ininame, 'CLMNAME':clmname, 'BRYNAME':bryname,
@@ -188,8 +206,16 @@ class ROMSRocker:
         }
         if self.uranus.active_comp[0]==0:
             sed_dic['FRCNAME']=frcname
+            
+        if hasattr(self, 'nml_mod'):
+            mod_pairs=self.nml_mod.split('|') 
+            for pair in mod_pairs:
+                key, val=pair.split(':')
+                sed_dic[key]=val
         for key, itm in sed_dic.items():
-            utils.sedline(key, f'{key} == {itm}', roms_in, count=1)
+            utils.write_log(f'{print_prefix}**NML_MOD**roms_in: {key} == {itm}')
+            utils.sedline(key, f'{key} == {itm}',roms_in, count=1)
+
 
     
     def load_domain(self):
@@ -243,18 +269,19 @@ class ROMSRocker:
             import wrf
             surf_file=io.get_wrf_fn(curr_time, f'{self.surf_wrfdom}')
             surf_file=os.path.join(surf_dir,surf_file)
-            wrf_hdl=nc4.Dataset(surf_file)
-            XLAT=wrf.getvar(wrf_hdl,'XLAT')
-            XLONG=wrf.getvar(wrf_hdl,'XLONG')
+            ds_hdl=xr.open_dataset(surf_file)
+            XLAT,XLONG=ds_hdl['XLAT'],ds_hdl['XLONG']
+            if XLAT.ndim==3:
+                XLAT,XLONG=XLAT[0,:,:], XLONG[0,:,:]
+            ds_hdl.close()
             ds_forc=io.gen_roms_forc_template(trange, XLAT, XLONG)
-            wrf_hdl.close()
             # iter timeframes 
             for idx,curr_time in enumerate(forc_time_series):
                 surf_file=io.get_wrf_fn(curr_time, f'{self.surf_wrfdom}')
                 utils.write_log(print_prefix+'Read surface forcing from '+surf_file)
                 surf_file=os.path.join(surf_dir,surf_file)
-                wrf_hdl=nc4.Dataset(surf_file)
-                
+                #wrf_hdl=nc4.Dataset(surf_file)
+                ds_hdl=xr.open_dataset(surf_file)
                 if hasattr(self, 'sim_trck'):
                     try:
                         curr_loc=self.sim_trck.index.get_loc(curr_time) 
@@ -266,19 +293,18 @@ class ROMSRocker:
                             print_prefix+'TC_INTENSIFY: NO TC record for '+curr_time.strftime('%Y%m%d%H'))
                         pass 
                 for roms_var, wrf_var in const.ROMS_WRF_FORC_MAPS.items():
-                    if roms_var=='Tair':
-                        temp_var = wrf.getvar(
-                            wrf_hdl, wrf_var, 
-                            timeidx=wrf.ALL_TIMES, method="cat")
-                        temp_var=temp_var-const.K2C
-                    elif roms_var=='Pair':
-                        temp_var = wrf.getvar(
-                            wrf_hdl, wrf_var, 
-                            timeidx=wrf.ALL_TIMES, method="cat", units='mb')
-                    else:
-                        temp_var = wrf.getvar(
+                    try:
+                        temp_var=ds_hdl[wrf_var]
+                    except KeyError:
+                        wrf_hdl=nc4.Dataset(surf_file)
+                        wrf_var=wrf_var.lower()
+                        temp_var=wrf.getvar(
                             wrf_hdl, wrf_var,
                             timeidx=wrf.ALL_TIMES, method="cat")
+                        wrf_hdl.close()
+                    if roms_var=='Tair':
+                       temp_var=temp_var-const.K2C
+                   
                     if ('curr_rec' in locals()) and (roms_var=='Uwind' or roms_var=='Vwind'):
                         utils.write_log(
                             print_prefix+f'TC_INTENSIFY: {roms_var} orginal range: {temp_var.min().values:.2f}, {temp_var.max().values:.2f}')
@@ -288,9 +314,10 @@ class ROMSRocker:
                         utils.write_log(
                             print_prefix+f'TC_INTENSIFY: {roms_var} intensified range: {temp_var.min().values:.2f}, {temp_var.max().values:.2f}')
                     ds_forc[roms_var].values[idx,:,:]=temp_var.values
-                wrf_hdl.close()
+                ds_hdl.close()
         forc_fn=os.path.join(
             self.proj_root,f'roms_forc_{self.domid}.nc')
+        utils.write_log(print_prefix+'Write surface forcing to '+forc_fn)
         ds_forc.to_netcdf(forc_fn)
     def build_icbc(self):
         """ build icbcs for ROMS """
@@ -630,6 +657,16 @@ class ROMSRocker:
             ds_bdy[var_bdy].values=self.ds_smp[varname].values[:,:,:,0]
             var_bdy=varname+'_east'
             ds_bdy[var_bdy].values=self.ds_smp[varname].values[:,:,:,-1]
+        
+        if self.cfg.has_section(self.uranus.mode):
+            if self.cfg.has_option(self.uranus.mode, 'roms_dynbdy_factor'):
+                dynbdy_factor=self.cfg.getfloat(self.uranus.mode, 'roms_dynbdy_factor')
+                utils.write_log(
+                    f'{print_prefix}ROMS DYNAMIC BOUNDARY FACTOR TURNED ON, factor={dynbdy_factor:.2f}',30)
+                for bdy in ['south','north','west','east']:
+                    for varname in ['u','v','vbar','ubar']:
+                        ds_bdy[varname+'_'+bdy].values*=dynbdy_factor
+            
         time_offset=time_frm - const.BASE_TIME
         # deal with time vars 
         for var in const.BDY_TIME_VAR:

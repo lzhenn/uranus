@@ -1,4 +1,4 @@
-fn='/home/lzhenn/array74/Njord_Calypso/domaindb/poseidon_LTtmr_L12/roms_d03.nc'
+fn='/home/lzhenn/array74/workspace/uranus/uranus/domaindb/njord_noluzon/roms_d01.nc'
 
 % Open the ROMS netCDF file for writing
 ncid = netcdf.open(fn, 'WRITE');

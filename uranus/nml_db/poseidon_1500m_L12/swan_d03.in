@@ -43,8 +43,7 @@ INPGRID FRIC CURVILINEAR 0 0 631 541 EXC 9.999000e+003                 &
 BOUNDNEST1 NEST 'swan_bdy_d03.dat' CLOSED
  
 & Restart name **********************************
-&INIT HOTSTART 'swan_inlet_rst.dat'
-
+&INITIAL HOTSTART MULTIPLE 'swan_hot_d03.dat'
 & PHYSICS  **************************************
 BREAKING CONSTANT 1.0 0.73
 FRICTION MADSEN 0.05
@@ -57,9 +56,9 @@ PROP BSBT
 BLOCK 'COMPGRID' NOHEADER 'swan_his_hsig_d03.nc'   LAY 4 HSIGN 1.    OUTPUT 20000101.000000 15 MIN
 &BLOCK 'COMPGRID' NOHEADER 'swan_his_setup_d03.nc'   LAY 4 SETUP 1.    OUTPUT 20000101.000000 15 MIN
 
-&RESTART 'swan_rst_d03.dat' FREE 1 HR
+RESTART 'swan_rst_d03.dat' FREE 1 HR
 
-COMPUTE NONSTAT ssyyyymmdd.hh0000 90 SEC eeyyyymmdd.hh0000
-HOTFILE 'swan_d02.hot'
+COMPUTE NONSTAT ssyyyymmdd.hh0000 60 SEC eeyyyymmdd.hh0000
+HOTFILE 'swan_hot_d03.dat'
 
 STOP

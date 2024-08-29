@@ -1,3 +1,7 @@
+*.png
+*.bmp
+*.jpg
+*.jpeg
 *.pyc
 *.log
 *.nc

@@ -2,8 +2,8 @@
 %addpath(genpath('/home/metctm1/array/project/1911-COAWST/script/mfiles'));
 
 
-smp_grid='/home/metctm1/array/app/WRFv43/WPS-4.3/geo_em.d01.nc'; % sample grid from wrf geogrid
-roms_grid='/home/lzhenn/array74/Njord_Calypso/domaindb/oriental/roms_d01.nc'; % Call generic grid creation.
+smp_grid='/home/lzhenn/array129/WRF-preprocess/WPS-4.1/geo_em.d01.nc'; % sample grid from wrf geogrid
+roms_grid='/home/lzhenn/array74/Njord_Calypso/domaindb/les_aqua/roms_d01.nc'; % Call generic grid creation.
 
 netcdf_load(smp_grid)
 figure
@@ -13,12 +13,12 @@ title('WRF LANDMASK grid, mercator proj')
 xlabel('longitude'); ylabel('latitiude')
 
 % pick connors, lat lon
-xl= 116.4; xr=129.7;
-yb= 21.7; yt= 41.2;
+xl= 118.01; xr=118.99;
+yb= 18.99; yt= 19.96;
 
 % pick numbers, roms nrow x ncol, I-dir xi_rho; J-dir eta_rho
 % Lm= xi_rho-2; Mm = eta_rho-2
-xi_rho =492; eta_rho=720;
+xi_rho =982; eta_rho=972;
 
 numx=xi_rho-1; numy=eta_rho-1;
 

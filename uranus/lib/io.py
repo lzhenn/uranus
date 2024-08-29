@@ -72,7 +72,7 @@ def get_wrf_fn(tgt_time, wrf_domain):
     '''
     return aimed wrf file name given tgt_time and wrf_domain
     '''
-    return 'wrfout_'+wrf_domain+'_'+tgt_time.strftime('%Y-%m-%d_%H:00:00')
+    return 'wrfout_'+wrf_domain+'_'+tgt_time.strftime('%Y-%m-%d_%H:%M:%S')
         
 def sel_frm(da_src, tf, itf):
     try:
@@ -149,7 +149,6 @@ def gen_roms_forc_template(ts, lat2d, lon2d):
         lat2d, lon2d: 2D arrays
     '''
     import xarray as xr
-    
     nt, (ny,nx)=len(ts), lat2d.shape
     # Create the dimensions
     xr_dim = xr.IndexVariable('xr', np.arange(nx))

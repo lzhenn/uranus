@@ -1,10 +1,10 @@
 import xarray as xr
 import numpy as np
 from PIL import Image
-work_dir='/home/lzhenn/array74/Njord_Calypso/domaindb/poseidon_LTtmr_L12/'
-ncfile=f'{work_dir}/roms_d03_omp.nc.bck'
-bmpfile=f'{work_dir}/LTtmr_binary.bmp'
-outfile=f'{work_dir}/roms_d03.nc'
+work_dir='/home/lzhenn/array74/workspace/uranus/uranus/domaindb/njord_noluzon'
+ncfile=f'{work_dir}/roms_d01_omp.nc'
+bmpfile=f'{work_dir}/roms_d01_noluzon.bmp'
+outfile=f'{work_dir}/roms_d01.nc'
 
 
 ds=xr.open_dataset(ncfile)

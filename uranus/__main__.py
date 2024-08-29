@@ -190,8 +190,10 @@ class Uranus:
  
             relative_cpl_in=os.path.join(
                 '.','Projects',self.nml_temp,'coupling.in')
+            log_name=f'coawstM.log'
+            #log_name=f'coawstM.{datetime.datetime.now().strftime("%y%m%d%H%M%S")}.log'
             cmd+=f' {relative_cpl_in}'
-            cmd+=f' >& {self.cplexe_root}/coawstM.{datetime.datetime.now().strftime("%y%m%d%H%M%S")}.log' 
+            cmd+=f' >& {self.cplexe_root}/{log_name}' 
             
             if self.machine_name == 'pird':
                 cwst_sbatch=f'{self.cplexe_root}/coawstM.sh'

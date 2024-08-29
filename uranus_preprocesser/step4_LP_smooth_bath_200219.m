@@ -1,16 +1,17 @@
 %addpath(genpath('/home/metctm1/array/project/1911-COAWST/script/mfiles'));
 %raw_fn='/home/lzhenn/Njord_dev/Projects/Njord_t123/roms_d03.nc';
 %out_fn='/home/lzhenn/Njord_dev/Projects/Njord_t123/roms_d03.lp0d1.nc';
-
-raw_fn='/home/lzhenn/array74/Njord_Calypso/domaindb/poseidon_LTtmr_L12/roms_d03.nc';
-out_fn='/home/lzhenn/array74/Njord_Calypso/domaindb/poseidon_LTtmr_L12/roms_d03_omp.nc';
+%raw_fn='/home/lzhenn/array74/workspace/uranus/uranus/domaindb/njord_noluzon/roms_d01.nc';
+%out_fn='/home/lzhenn/array74/workspace/uranus/uranus/domaindb/njord_noluzon/roms_d01_omp.nc';
+raw_fn='/home/lzhenn/array74/workspace/uranus/uranus/domaindb/les_aqua/roms_d01.nc';
+out_fn='/home/lzhenn/array74/workspace/uranus/uranus/domaindb/les_aqua/roms_d01_omp.nc';
 
 [status,cmdout] = system(['cp ' raw_fn ' ' out_fn]);
 status
 
 netcdf_load(raw_fn);
 
-rx0max=0.08;
+rx0max=0.1;
 disp(['Target for rx0=' num2str(rx0max)]);
 
 disp('Using LP method with heuristic');

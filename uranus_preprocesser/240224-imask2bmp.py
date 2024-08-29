@@ -2,8 +2,8 @@ import numpy as np
 import xarray as xr
 from PIL import Image, ImageDraw 
 
-ncfile='/home/lzhenn/array74/Njord_Calypso/domaindb/poseidon_1500m_L12/roms_d03_omp.nc.bck'
-bmpfile='../fig/roms_d03_omp.bmp'
+ncfile='/home/lzhenn/array74/workspace/uranus/uranus/domaindb/njord_noluzon/roms_d01_omp.nc'
+bmpfile='roms_d01.bmp'
 ds=xr.open_dataset(ncfile)
 
 imask=ds['mask_rho'].values[::-1,:]

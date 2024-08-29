@@ -3,14 +3,14 @@ load "$NCARG_ROOT/lib/ncarg/nclscripts/wrf/WRF_contributed.ncl"
 begin
     g_font=0.015
    
-    raw_fn="/home/metctm1/array/app/COAWST/COAWST_operational/Projects/GBA/roms-grid-ust/roms_d02.nc"
+    raw_fn="/home/lzhenn/array74/Njord_Calypso/domaindb/les_aqua/roms_d01.nc"
     bck_fn=""
     
     org_in      = addfile ("/home/metctm1/array/data/topo/gebco/GEBCO_2019.nc", "r")
-    bath=org_in->elevation({21.4:23.1},{112.4:115.1})
+    bath=org_in->elevation({18.9:20.0},{117.8:119.2})
     bath=-bath
-    lon=org_in->lon({112.4:115.1})
-    lat=org_in->lat({21.4:23.1})
+    lon=org_in->lon({117.8:119.2})
+    lat=org_in->lat({18.9:20.0})
     roms_grid_in=addfile(raw_fn,"w")
     lat_rho=roms_grid_in->lat_rho
     lon_rho=roms_grid_in->lon_rho
@@ -27,7 +27,7 @@ begin
         print(""+ii+"/"+dim_x)
     end do
     h=where(h .lt. 10, 10, h)
-    h=where(h .gt. 3000, 3000, h)
+    h=where(h .gt. 8000, 8000, h)
     roms_grid_in->h=h
    ; result0=systemfunc("cp "+raw_fn+" "+bck_fn )
     h@lat2d=lat_rho

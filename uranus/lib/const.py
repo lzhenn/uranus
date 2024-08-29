@@ -32,11 +32,22 @@ MACHINE_DIC={
         'cfgdb_root':'/home/lzhenn/array74/workspace/uranus/uranus/nml_db/',
         'domdb_root':'/home/lzhenn/array74/Njord_Calypso/domaindb/'
     },
+    'hqlx129':{
+        'bashrc':'/home/lzhenn/.bashrc_oneapi_amd',
+        'mpicmd':'mpirun', 'corespernode':128, 'nodes':1,
+        'metgrid_np':32, 'real_np':32, 'wrf_np':32,
+        'njord_root':'/home/lzhenn/array129/COAWST_Njord_v35',
+        'aegir_root':'/home/lzhenn/array129/COAWST_Aegir',
+        'poseidon_root':'/home/lzhenn/array129/COAWST_Poseidon',
+        'calypso_root':'/home/lzhenn/array129/COAWST_Calypso',
+        'cfgdb_root':'/home/lzhenn/array74/workspace/uranus/uranus/nml_db/',
+        'domdb_root':'/home/lzhenn/array74/Njord_Calypso/domaindb/'
+    },
     'hqlx130':{
         'bashrc':'/home/lzhenn/.bashrc_oneapi_amd',
         'mpicmd':'mpirun', 'corespernode':128, 'nodes':1,
-        'metgrid_np':16, 'real_np':16, 'wrf_np':32,
-        'njord_root':'/home/lzhenn/array130/COAWST_Njord',
+        'metgrid_np':32, 'real_np':32, 'wrf_np':32,
+        'njord_root':'/home/lzhenn/array130/COAWST_Njord_v35',
         'aegir_root':'/home/lzhenn/array130/COAWST_Aegir',
         'poseidon_root':'/home/lzhenn/array130/COAWST_Poseidon',
         'calypso_root':'/home/lzhenn/array130/COAWST_Calypso',
@@ -92,7 +103,7 @@ MACHINE_DIC={
 
 }
 for itm in [
-    '47','54','62','65','69','129',
+    '47','54','62','65','69',
     '133','132','111','100','174','179']:
     MACHINE_DIC['hqlx'+itm]=MACHINE_DIC['hqlx74']
 
@@ -104,7 +115,7 @@ DRV_DIC={
     # WRF
     'cpsv3_wrf':{
         'use_ungrib':False,'atm_nfrq':'6H','atm_file_nfrq':'1D', 'frm_per_file':4,
-        'vcoord':'sigmap', 'acoef':'hyam', 'bcoef':'hybm', 'psname':'PS', 
+        'vcoord':'sigmap', 'acoef':'hyam', 'bcoef':'hybm', 'psname':'PS','p0name':'P0', 
         'lnd_file_nfrq':'1D', 'soillv':'cpsv3', 'soil_dim_name':'levsoi',
         'atm_naming_pattern':'$I%Y%m%d%H$I.cam2.h4.$F%Y-%m-%d$F-00000.nc',
         'lnd_naming_pattern':'$I%Y%m%d%H$I.clm2.h2.$F%Y-%m-%d$F-00000.nc',
@@ -208,8 +219,8 @@ BDY_TIME_VAR=['v2d','v3d','temp','salt', 'zeta']
 
 ROMS_WRF_FORC_MAPS={
     'Uwind': 'U10', 'Vwind': 'V10', 
-    'Pair': 'slp', 'Tair': 'T2',  
-    'Qair': 'rh2', 
+    'Pair': 'SLP', 'Tair': 'T2',  
+    'Qair': 'RH2', 
     #'swrad': 'GSW', 
     'swrad': 'SWDOWN', 
     #'lwrad': 'LWDNB', 

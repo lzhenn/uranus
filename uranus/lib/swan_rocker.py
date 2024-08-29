@@ -86,6 +86,9 @@ class SWANRocker:
             else:
                 utils.throw_error(f'{print_prefix}{self.drv_root} missing wav file(s)')
         
+        if 'nml_modification' in swancfg:
+            self.nml_mod=swancfg['nml_modification']
+ 
         utils.write_log(f'{print_prefix}SWANMaker Initiation Done.')
     def rock(self):
         """ build initial and boundary files for SWAN """
@@ -181,8 +184,9 @@ class SWANRocker:
             'eeyyyymmdd.hh',self.end_time.strftime('%Y%m%d.%H'),
             nml_dest,whole_line=False)
         if self.restart_run:
+            utils.write_log(print_prefix+'Restart run! PLEASE REWRITE WIND IF NECESSARY...',30)
             utils.sedline(
-                '&INITIAL','INITIAL',nml_dest,whole_line=False)
+                '&INIT','INIT',nml_dest,whole_line=False)
     def clean_workspace(self):
         io.del_files(self.swan_root, const.SWAN_CLEAN_LIST)
             
@@ -195,7 +199,9 @@ class SWANRocker:
         for seg in self.segs:
             cmd_line='%sBOUNDSPEC SEGMENT XY %8.4f %8.4f %8.4f %8.4f VARIABLE FILE 0 \'%s\'\n' % (
                 cmd_line, seg['lon0'], seg['lat0'], seg['lon1'], seg['lat1'], seg['file'])
-        
+        print(cmd_line)
+        # below for build seg cmd for swan d01
+        '''        
         with open(self.proj_root+'/swan_d01.in', 'r') as sources:
             lines = sources.readlines()
 
@@ -204,7 +210,7 @@ class SWANRocker:
                 # regexp pipeline
                 line=re.sub('@BOUNDSPEC', cmd_line, line)
                 sources.write(line)
-    
+        '''    
     def form_bdy(self, bdy_type, maskline, latline, lonline):
         """ form boundary accourding to maskline """
         find_flag=False
@@ -340,18 +346,18 @@ class SWANRocker:
             
             utils.write_log(print_prefix+'Read WRFOUT surface wind...')
             wrf_hdl=nc4.Dataset(wrf_file)
-            
-            wrf_u10 = wrf.getvar(
-                    wrf_hdl, 'U10', 
-                    timeidx=wrf.ALL_TIMES, method="cat")
-            wrf_v10 = wrf.getvar(
-                    wrf_hdl, 'V10',
-                    timeidx=wrf.ALL_TIMES, method="cat")
             wrf_time=wrf.extract_times(
                     wrf_hdl,timeidx=wrf.ALL_TIMES, do_xtime=False)
-            wrf_hdl.close()
-            
             wrf_time=[pd.to_datetime(itm) for itm in wrf_time]
+            wrf_hdl.close()
+            # use xarray
+            ds_hdl=xr.open_dataset(wrf_file)
+            XLAT,XLONG=ds_hdl['XLAT'],ds_hdl['XLONG']
+            if XLAT.ndim==3:
+                XLAT,XLONG=XLAT[0,:,:], XLONG[0,:,:]
+            wrf_u10 =ds_hdl['U10']
+            wrf_v10 =ds_hdl['V10']
+            ds_hdl.close()
             
             utils.write_log(print_prefix+'Query Wind Timestamp:'+str(curr_time))
             u10_tmp=wrf_u10
