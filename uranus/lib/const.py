@@ -74,6 +74,16 @@ MACHINE_DIC={
         'cfgdb_root':'/home/lzhenn/array74/workspace/uranus/uranus/nml_db/',
         'domdb_root':'/home/lzhenn/array74/Njord_Calypso/domaindb/'
     },
+    'hqlx84':{ # SEA production environment
+        'bashrc':'/home/lzhenn/.bashrc_liquor_i22wrf415',
+        'mpicmd':'mpirun', 'corespernode':256, 'nodes':1,
+        'metgrid_np':96, 'real_np':96, 'wrf_np':192,
+        'njord_root':'/home/lzhenn/array181/op_njord/model/COAWST_Njord/',
+        'poseidon_root':'/home/lzhenn/array181/op_njord/model/COAWST_Poseidon',
+        'opexe_root':'/home/lzhenn/array181/op_njord/model/COAWST_Njord/',
+        'cfgdb_root':'/home/lzhenn/array74/workspace/uranus/uranus/nml_db/',
+        'domdb_root':'/home/lzhenn/array74/Njord_Calypso/domaindb/'
+    },
     'hqlx86':{
         'bashrc':'/home/metctm1/.bashrc_i20_cwst38',
         'mpicmd':'mpirun', 'corespernode':48, 'nodes':1,

@@ -117,7 +117,7 @@ GEN3 KOMEN
 WCAP KOM 2.36E-5 3.02E-3 2.0 1.0 1.0
 PROP BSBT
 
-BLOCK 'COMPGRID' NOHEADER  'swan_his_hsig_d01.nc'    LAY 4 HSIGN 1.  OUTPUT ssyyyymmdd.hh0000 1 HR
+&BLOCK 'COMPGRID' NOHEADER  'swan_his_hsig_d01.nc'    LAY 4 HSIGN 1.  OUTPUT ssyyyymmdd.hh0000 1 HR
 &BLOCK 'COMPGRID' NOHEADER  'hswell_d01.nc'    LAY 4 HSWELL 1.  OUTPUT ssyyyymmdd.hh0000 1 HR
 &BLOCK 'COMPGRID' NOHEADER  'pdir_d01.nc'    LAY 4 PDIR 1.  OUTPUT ssyyyymmdd.hh0000 1 HR
 &BLOCK 'COMPGRID' NOHEADER  'tps_d01.nc'  LAY 4 TPS 1.   OUTPUT ssyyyymmdd.hh0000 1 HR
@@ -127,10 +127,10 @@ BLOCK 'COMPGRID' NOHEADER  'swan_his_hsig_d01.nc'    LAY 4 HSIGN 1.  OUTPUT ssyy
 &SPEC 'SITE' SPEC2D ABS 'swan_spec_yangjiang.ascii' OUTPUT ssyyyymmdd.hh0000 1 HR
 NGRID 'd02bdy' 112.475 21.483 0 2.502 1.5018 40 24
 NESTOUT 'd02bdy' 'swan_bdy_d02.dat' OUTPUT 1 1 HR
-&NGRID 'd03bdy' 113.823 22.116 0 0.658 0.507 52 40
-&NESTOUT 'd03bdy' 'swan_bdy_d03.dat' OUTPUT 1 15 MIN
-NGRID 'lesbdy' 118.0 19.0 0 1.01 1.01 101 101
-NESTOUT 'lesbdy' 'lesbdy.dat' OUTPUT 1 1 HR
+NGRID 'd03bdy' 113.823927 22.116491 0 0.6565 0.5062 264 204
+NESTOUT 'd03bdy' 'swan_bdy_d03.dat' OUTPUT 1 15 MIN
+NGRID 'lesbdy' 118.01 18.99 0 0.98 0.97 200 199
+NESTOUT 'lesbdy' 'lesbdy.dat' OUTPUT 1 15 MIN
 
 
 &RESTART 'swan_rst_d01.dat' FREE 24 HR
