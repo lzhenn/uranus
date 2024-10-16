@@ -1,7 +1,7 @@
 #/usr/bin/env python3
 """Driven Data Crawler"""
 from . import const, utils, io, roms_down_fcst_drv
-import datetime, os, requests
+import datetime, os, requests, time
 print_prefix='lib.Crawler>>'
 class Crawler():
     def __init__(self, uranus):
@@ -29,26 +29,29 @@ class Crawler():
             if drv_type=='cfsr':
                 url_base='https://www.ncei.noaa.gov/oa/prod-cfs-reanalysis/6-hourly-ocean/'
                 #https://www.ncei.noaa.gov/oa/prod-cfs-reanalysis/6-hourly-ocean/1979/197901/19790101/ocnh01.gdas.1979010100.grb2
-                if curr_time_obj<=self.end_time: 
+                while curr_time_obj<=self.end_time: 
                     utils.write_log(
                         f'{print_prefix}download CFSR Ocean @ {curr_time_obj.strftime("%Y%m%d%H")} to {drv_root}...')  
                     fn='ocnh01.gdas.'+curr_time_obj.strftime('%Y%m%d%H')+'.grb2'
                     # sanity check
                     if os.path.exists(drv_root+'/'+fn):
-                        utils.write_log(f'{print_prefix} exists.')
+                        utils.write_log(f'{print_prefix}{fn} exists.')
+                        curr_time_obj=curr_time_obj+datetime.timedelta(days=1)
+                        continue
                     yyyy,yyyymm=curr_time_obj.strftime('%Y'),curr_time_obj.strftime('%Y%m')
                     yyyymmdd=curr_time_obj.strftime('%Y%m%d')
                     url=url_base+yyyy+'/'+yyyymm+'/'+yyyymmdd+'/'+fn
                     try:
                         rqst=requests.get(url)
                     except:
-                        write_log(f'{print_prefix}CFSR Ocean fetch failed, exit...')
+                        utils.write_log(f'{print_prefix}CFSR Ocean fetch failed, exit...')
                         exit()
                     if (rqst.status_code == 200):
                         f = open(drv_root+'/'+fn, 'wb')
                         f.write(rqst.content)
                         f.close()
                         utils.write_log(f'{print_prefix} {fn} done.')
+                    time.sleep(5)
                     curr_time_obj=curr_time_obj+datetime.timedelta(days=1)
             elif drv_type=='hycom':
                 # parser

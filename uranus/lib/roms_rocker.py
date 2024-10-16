@@ -63,7 +63,11 @@ class ROMSRocker:
         if self.cfg.has_section(uranus.mode):
             if self.cfg.has_option(uranus.mode, 'tc_intense_factor'):
                 self.tc_intense_factor=self.cfg.getfloat(uranus.mode, 'tc_intense_factor')
-                utils.write_log(f'{print_prefix}TC INTENSIFICATION TURNED ON, factor={self.tc_intense_factor:.2f},30')
+                if self.cfg.has_option(uranus.mode, 'tc_radius'):
+                    self.tc_radius=self.cfg.getfloat(uranus.mode, 'tc_radius')
+                else:
+                    self.tc_radius=500
+                utils.write_log(f'{print_prefix}TC INTENSIFICATION TURNED ON, factor={self.tc_intense_factor:.2f},radius={self.tc_radius},30')
                 try:
                     self.sim_trck=pd.read_csv(
                         f'{self.surf_root}/tc_track.csv', parse_dates=['time'],index_col=['time'])
@@ -105,7 +109,6 @@ class ROMSRocker:
                     self.drv_root, self.drv_dic, self.strt_time, self.end_time, kw='ocn')
         # sanity check
         stat=io.check_filelist(self.ocnfn_lst)
-        
         if not(stat):
             if self.uranus.fcst_flag:
                 for buf_day in range(1,3):
@@ -154,7 +157,8 @@ class ROMSRocker:
             nrst=int(self.nrst[:-1])
             nrst=nrst*const.MIN_IN_SEC//self.dt
         else:
-            utils.throw_error(f'{print_prefix}unknown nrst {self.nrst}, usage e.g. 30M, 6H, 1D')
+            nrst=int(self.nrst[:-1])
+            nrst=nrst*const.DAY_IN_SEC//self.dt
         nhis=self.nhis*const.MIN_IN_SEC//self.dt 
         # only use half day
         ndefhis=nhis
@@ -310,7 +314,7 @@ class ROMSRocker:
                             print_prefix+f'TC_INTENSIFY: {roms_var} orginal range: {temp_var.min().values:.2f}, {temp_var.max().values:.2f}')
                         temp_var=mathlib.intensify_tc(
                             self.tc_intense_factor, temp_var,
-                            curr_rec['lat'], curr_rec['lon'])
+                            curr_rec['lat'], curr_rec['lon'],radius=self.tc_radius)
                         utils.write_log(
                             print_prefix+f'TC_INTENSIFY: {roms_var} intensified range: {temp_var.min().values:.2f}, {temp_var.max().values:.2f}')
                     ds_forc[roms_var].values[idx,:,:]=temp_var.values
@@ -403,7 +407,11 @@ class ROMSRocker:
         """ load raw GCM/ROMS files to build ICBC"""
         fn = self.ocnfn_lst[it]
         utils.write_log(print_prefix+'Load raw file: '+fn)
-        self.ds_raw=xr.load_dataset(fn)
+        if self.drv_type=='cfsr':
+            self.ds_raw=xr.load_dataset(
+                fn,backend_kwargs={'filter_by_keys':{'typeOfLevel':'depthBelowSea'}})
+        else:
+            self.ds_raw=xr.load_dataset(fn)
         ds_raw=self.ds_raw
         self.varname_remap()
         # deal with previous hycom
@@ -417,7 +425,7 @@ class ROMSRocker:
                     'depth':ds_raw['Depth'],
                     'lon': ds_raw['Longitude'][0,:], 
                     'lat': ds_raw['Latitude'][:,0]}) 
-        elif self.drv_type=='cfs':
+        elif self.drv_type =='cfs':
             ds_raw=ds_raw.rename_dims({
                 'depthBelowSea':'depth',
                 'latitude':'lat','longitude':'lon'})
@@ -425,6 +433,14 @@ class ROMSRocker:
                 'depth':ds_raw['depthBelowSea'],
                 'lon': ds_raw['longitude'], 
                 'lat': ds_raw['latitude']})
+            ds_raw=ds_raw.drop_indexes(
+                ['depthBelowSea','latitude','longitude'])
+            ds_raw['pt'].values=ds_raw['pt'].values-const.K2C
+            ds_raw['s'].values=ds_raw['s'].values*1000.0
+        elif self.drv_type=='cfsr':
+            ds_raw=ds_raw.rename_dims({
+                'depthBelowSea':'depth',
+                'latitude':'lat','longitude':'lon'})
             ds_raw=ds_raw.drop_indexes(
                 ['depthBelowSea','latitude','longitude'])
             ds_raw['pt'].values=ds_raw['pt'].values-const.K2C
@@ -459,7 +475,7 @@ class ROMSRocker:
         # check all included       
         for roms_var in const.ROMS_VAR_NAME_MAPS:
             if roms_var not in self.varmap:
-                if self.drv_type=='cfs' and roms_var=='zeta':
+                if self.drv_type in ['cfs','cfsr'] and roms_var=='zeta':
                     self.varmap[roms_var]='zeta'
                     return
                 utils.throw_error(

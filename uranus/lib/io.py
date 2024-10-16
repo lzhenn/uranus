@@ -34,6 +34,9 @@ def hpc_quechck(chck_cmd, jobid):
         stdout=rcode.stdout.decode()
 
 def check_filelist(filelist):
+    if len(filelist)==0:
+        utils.write_log(f'{print_prefix} Empty ocnfn_lst filelist')
+        return False
     for file in filelist:
         if not os.path.exists(file):
             utils.write_log(f'{print_prefix}Missing {file}')
@@ -123,25 +126,19 @@ def gen_patternfn_lst(drv_root, drv_dic, inittime,
         pattern=pattern.replace(f'$I{init_fmt}$I', init_str)
     if '$S' in pattern:
         pattern=pattern.replace(f'$S', special)
-    
-    if '$A' in pattern:
-        for tf in tfs:
-            # Replace the placeholders with the formatted strings
+    for tf in tfs:
+        # Replace the placeholders with the formatted strings
+        if '$A' in pattern:
             dt=tf-inittime
             fn=pattern.replace(f'$A', str(int(dt.total_seconds()/3600)).zfill(3))
-            fn_full=os.path.join(drv_root, fn)
-            fn_lst.append(fn_full)
-    elif '$F' in pattern:    
-        frm_fmt=pattern.split('$F')[1]
-        for tf in tfs: 
+        elif '$F' in pattern:    
+            frm_fmt=pattern.split('$F')[1]
             frm_str = tf.strftime(frm_fmt)
-            # Replace the placeholders with the formatted strings
             fn=pattern.replace(f'$F{frm_fmt}$F', frm_str)
-            fn_full=os.path.join(drv_root, fn)
-            #if not(os.path.exists(fn_full)):
-            #    utils.throw_error(f'file not exist: {fn_full}')
-            fn_lst.append(fn_full)
-           
+        else:
+            fn=pattern
+        fn_full=os.path.join(drv_root, fn)
+        fn_lst.append(fn_full)
     return fn_lst, tfs
 def gen_roms_forc_template(ts, lat2d, lon2d):
     '''generate the forcing template file for ROMS

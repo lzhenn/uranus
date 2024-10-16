@@ -176,7 +176,7 @@ DRV_DIC={
     'cfs_roms':{'ocn_naming_pattern':'ocnf$F%Y%m%d%H$F.01.$I%Y%m%d%H$I.grb2'},
     'cfsr_roms':{
         'ocn_nfrq':'24H','ocn_file_nfrq':'1D',
-        'ocn_naming_pattern':'ocnh01.gdas.$I%Y%m%d%H$I.grb2'},
+        'ocn_naming_pattern':'ocnh01.gdas.$F%Y%m%d%H$F.grb2'},
     'hycom_roms':{
         'ocn_nfrq':'24H','ocn_file_nfrq':'1D',
         'ocn_naming_pattern':'hycom_$F%Y%m%d%H$F.nc'},
