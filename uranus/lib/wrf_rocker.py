@@ -96,7 +96,7 @@ class WRFRocker:
                     sed_dic[key]=val
             for key, itm in sed_dic.items():
                 utils.write_log(f'{print_prefix}**NML_MOD**namelist.input: {key} = {itm}')
-                utils.sedline(key, f'{key} = {itm}',nml_dest)
+                utils.sedline(key, f'{key} = {itm}',nml_dest,count=1)
             
             utils.sed_wrf_timeline('start_year',start_time,nml_dest,fmt='%Y')
             utils.sed_wrf_timeline('start_month',start_time,nml_dest,fmt='%m')

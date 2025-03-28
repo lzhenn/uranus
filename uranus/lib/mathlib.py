@@ -1,15 +1,15 @@
 import numpy as np
 from . import utils, const
 
-def intensify_tc(fc, da, lat0, lon0, radius=500):
+def intensify_tc(fc, da, lat0, lon0, radius=500,shift_lat=0,shift_lon=0):
     xlat,xlon=da['XLAT'].values,da['XLONG'].values
-    mask=gen_square_mask(xlat, xlon, lat0, lon0, radius, fc)
+    mask=gen_square_mask(xlat, xlon, lat0, lon0, radius, fc, shift_lat,shift_lon)
     da.values=da.values*mask
     return da
-def gen_square_mask(xlat, xlon, lat0, lon0, radius, fc):
+def gen_square_mask(xlat, xlon, lat0, lon0, radius, fc, shift_lat=0,shift_lon=0):
     mask=np.ones(xlat.shape)
     r2dr=radius/111.12
-    mask[(xlat>=lat0-r2dr) & (xlat<=lat0+r2dr) & (xlon>=lon0-r2dr) & (xlon<=lon0+r2dr)]=fc
+    mask[(xlat>=lat0-r2dr+shift_lat) & (xlat<=lat0+r2dr+shift_lat) & (xlon>=lon0-r2dr+shift_lon) & (xlon<=lon0+r2dr+shift_lon)]=fc
     return mask
 def sigma2depth(zeta,h,ds_smp):
         

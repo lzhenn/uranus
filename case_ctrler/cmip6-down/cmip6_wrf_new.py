@@ -27,7 +27,7 @@ print(args)
 
 config['URANUS']['machine_name']=f'hqlx{args.mach}'
 config['URANUS']['model_init_ts']=f'{args.year}010100'
-if int(args.year) > 2030:
+if int(args.year) >= 2040:
     config['URANUS']['nml_temp']='path_2050_lantau'
     
 config['URANUS']['model_run_span']=f'{args.day}D'

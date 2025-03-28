@@ -66,7 +66,15 @@ class ROMSRocker:
                 if self.cfg.has_option(uranus.mode, 'tc_radius'):
                     self.tc_radius=self.cfg.getfloat(uranus.mode, 'tc_radius')
                 else:
-                    self.tc_radius=500
+                    self.tc_radius=300
+                if self.cfg.has_option(uranus.mode, 'shift_lat'):
+                    self.shift_lat=self.cfg.getfloat(uranus.mode, 'shift_lat')
+                else:
+                    self.shift_lat=0
+                if self.cfg.has_option(uranus.mode, 'shift_lon'):
+                    self.shift_lon=self.cfg.getfloat(uranus.mode, 'shift_lon')
+                else:
+                    self.shift_lon=0
                 utils.write_log(f'{print_prefix}TC INTENSIFICATION TURNED ON, factor={self.tc_intense_factor:.2f},radius={self.tc_radius},30')
                 try:
                     self.sim_trck=pd.read_csv(
@@ -314,7 +322,8 @@ class ROMSRocker:
                             print_prefix+f'TC_INTENSIFY: {roms_var} orginal range: {temp_var.min().values:.2f}, {temp_var.max().values:.2f}')
                         temp_var=mathlib.intensify_tc(
                             self.tc_intense_factor, temp_var,
-                            curr_rec['lat'], curr_rec['lon'],radius=self.tc_radius)
+                            curr_rec['lat'], curr_rec['lon'],radius=self.tc_radius,
+                            shift_lat=self.tc_shift_lat, shift_lon=self.tc_shift_lon)
                         utils.write_log(
                             print_prefix+f'TC_INTENSIFY: {roms_var} intensified range: {temp_var.min().values:.2f}, {temp_var.max().values:.2f}')
                     ds_forc[roms_var].values[idx,:,:]=temp_var.values

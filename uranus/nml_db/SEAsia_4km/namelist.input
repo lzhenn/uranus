@@ -190,6 +190,6 @@
  /
 
  &namelist_quilt
- nio_tasks_per_group = 8,
+ nio_tasks_per_group = 10,
  nio_groups = 6,
  /

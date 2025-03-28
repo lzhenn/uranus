@@ -22,9 +22,11 @@ from tempfile import mkstemp
 def build_execmd(mach_name, bashrc, exeroot, mpicmd, ntasks, exename):
     mach_dic=const.MACHINE_DIC[mach_name]
     nnodes=max(1,ntasks//mach_dic['corespernode'])
-    if 'hqlx' in mach_name:
-        #return f'ssh {mach_name} "source {bashrc}; cd {exeroot};{mpicmd} -np {ntasks} ./{exename}"'
-        return f'source {bashrc}; cd {exeroot};{mpicmd} -np {ntasks} ./{exename}'
+    if mach_name in [f'hqlx{i}' for i in range(204,219)]:
+        return f'ssh {mach_name} "source {bashrc}; cd {exeroot};{mpicmd} -np {ntasks} -hostfile mpihost ./{exename}"'
+    elif 'hqlx' in mach_name:
+        return f'ssh {mach_name} "source {bashrc}; cd {exeroot};{mpicmd} -np {ntasks} ./{exename}"'
+        #return f'source {bashrc}; cd {exeroot};{mpicmd} -np {ntasks} ./{exename}'
     elif mach_name == 'th2':
         return f'source {bashrc}; cd {exeroot};{mpicmd} -N {nnodes} -n {ntasks} ./{exename}'
     elif mach_name == 'pird':

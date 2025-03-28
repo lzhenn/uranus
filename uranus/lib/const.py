@@ -117,6 +117,9 @@ for itm in [
     '133','132','111','100','174','179']:
     MACHINE_DIC['hqlx'+itm]=MACHINE_DIC['hqlx74']
 
+for itm in range(204,219):
+    MACHINE_DIC['hqlx'+str(itm)]=MACHINE_DIC['hqlx84']
+
 NML_SPECIFIC={
     'SEAsia_4km':{'metgrid_np':48, 'real_np':64}
 }
