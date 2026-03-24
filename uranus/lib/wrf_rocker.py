@@ -27,7 +27,7 @@ class WRFRocker:
         self.run_real=wrfcfg.getboolean('run_real')
         self.run_wrf=wrfcfg.getboolean('run_wrf')
         self.drv_root=utils.valid_path(
-            utils.parse_fmt_timepath(self.uranus.sim_strt_time, wrfcfg['drv_root']))
+            utils.parse_fmt_timepath(self.uranus.ref_time, wrfcfg['drv_root']))
         self.down_drv=wrfcfg.getboolean('down_drv_data')
         self.wps_root, self.wrf_root=utils.valid_path(wrfcfg['wps_root']), utils.valid_path(wrfcfg['wrf_root'])
         self.ntasks_wrf=uranus.ntasks_atm
@@ -108,14 +108,54 @@ class WRFRocker:
             utils.sed_wrf_timeline('end_day',end_time,nml_dest,fmt='%d')
             utils.sed_wrf_timeline('end_hour',end_time,nml_dest,fmt='%H')
     def clean_workspace(self):
+        # Kill stale processes in target work directories before cleaning files
+        self._kill_stale_procs()
+
         if self.run_ungrib:
             io.del_files(self.wps_root, const.UNGRIB_CLEAN_LIST)
-        
+
         if self.run_metgrid:
             io.del_files(self.wps_root, const.METGRID_CLEAN_LIST)
-        
+
         if self.run_real:
             io.del_files(self.wrf_root, const.WRF_CLEAN_LIST)
+
+    def _kill_stale_procs(self):
+        """Kill stale WRF/WPS processes whose cwd matches the current work directories.
+        Only kills processes in the specific wps_root/wrf_root to avoid affecting
+        other WRF runs on the same machine."""
+        import time
+        mach_name = self.mach_name
+        exe_dir_pairs = []
+        if self.run_ungrib or self.run_metgrid:
+            exe_dir_pairs.append(('ungrib.exe|metgrid.exe', self.wps_root))
+        if self.run_real:
+            exe_dir_pairs.append(('real.exe', self.wrf_root))
+
+        for exe_pattern, work_dir in exe_dir_pairs:
+            # Find and kill mpirun/exe processes whose cwd matches work_dir
+            # Use /proc/PID/cwd to identify processes by working directory
+            kill_script = (
+                f"for pid in $(pgrep -f '{exe_pattern}'); do "
+                f"  cwd=$(readlink /proc/$pid/cwd 2>/dev/null); "
+                f"  if [ \"$cwd\" = \"{work_dir}\" ]; then "
+                f"    echo \"Killing stale $pid (cwd=$cwd)\"; "
+                f"    kill -9 $pid 2>/dev/null; "
+                f"  fi; "
+                f"done; "
+                f"for pid in $(pgrep -f 'mpirun.*{exe_pattern.split(chr(124))[0]}'); do "
+                f"  echo \"Killing stale mpirun $pid\"; "
+                f"  kill -9 $pid 2>/dev/null; "
+                f"done"
+            )
+            if 'hqlx' in mach_name:
+                cmd = f'ssh {mach_name} "{kill_script}"'
+            else:
+                cmd = kill_script
+            utils.write_log(f'{print_prefix}Cleaning stale processes for {exe_pattern} in {work_dir}')
+            subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # Brief pause to ensure processes are fully terminated
+        time.sleep(2)
             
     def downdrv(self):
         if self.down_drv:
@@ -223,7 +263,7 @@ class WRFRocker:
             kw='atm',special=special)
         # lnd 
         if self.drv_type in ['cpsv3','bcmm']:
-            self.lnd_root=utils.parse_fmt_timepath(self.uranus.sim_strt_time, self.cfg[self.drv_type]['lnd_root'])
+            self.lnd_root=utils.parse_fmt_timepath(self.uranus.ref_time, self.cfg[self.drv_type]['lnd_root'])
             self.lndfn_lst, _=io.gen_patternfn_lst(
                 self.lnd_root, drv_dic, init_time, end_time, 
                 kw='lnd',special=special)

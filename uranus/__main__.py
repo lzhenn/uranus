@@ -66,7 +66,11 @@ class Uranus:
         self.run_hours=utils.parse_runspan(cfg['model_run_span'])
         self.sim_end_time=self.sim_strt_time+datetime.timedelta(hours=self.run_hours)
 
-
+        if 'opspinup' in self.nml_temp:
+            self.ref_time=self.sim_end_time
+        else:
+            self.ref_time=self.sim_strt_time
+        
         self.machine_name=cfg['machine_name']
         self.machine_dic=const.MACHINE_DIC[self.machine_name]
         self.update_machine_dic()
@@ -96,7 +100,7 @@ class Uranus:
             self.crawler=crawler.Crawler(self)
         
         self.arch_flag=cfg.getboolean('archive_flag')
-        self.arch_root=utils.parse_fmt_timepath(self.sim_strt_time, cfg['arch_root'])
+        self.arch_root=utils.parse_fmt_timepath(self.ref_time, cfg['arch_root'])
         # copy config file 
         cfgfn=os.path.join(
         self.cfgdb_root, self.nml_temp, '*in')
@@ -122,7 +126,7 @@ class Uranus:
         except KeyError:
             pass
         try:
-            self.machine_dic[f'{self.mode}_root']=self.cfg['cwst_path']
+            self.machine_dic[f'{self.mode}_root']=self.cfg['URANUS']['cwst_path']
         except KeyError:
             pass
  
@@ -179,6 +183,8 @@ class Uranus:
             self.romsmaker.prepare_cplrock()
             # swan flow
             self.swanmaker.prepare_cplrock()
+            # kill stale coawstM processes in cplexe_root before launching
+            self._kill_stale_coawst()
             # run coawstM
             # special for cmme
             if self.machine_name == 'pird':
@@ -222,6 +228,34 @@ class Uranus:
         if self.arch_flag:
             self.archive_data()
     
+    def _kill_stale_coawst(self):
+        """Kill stale coawstM processes whose cwd matches cplexe_root."""
+        import time as _time
+        cplexe = self.cplexe_root
+        kill_script = (
+            f"for pid in $(pgrep -f 'coawstM'); do "
+            f"  cwd=$(readlink /proc/$pid/cwd 2>/dev/null); "
+            f"  if [ \"$cwd\" = \"{cplexe}\" ]; then "
+            f"    echo \"Killing stale coawstM $pid (cwd=$cwd)\"; "
+            f"    kill -9 $pid 2>/dev/null; "
+            f"  fi; "
+            f"done; "
+            f"for pid in $(pgrep -f 'mpirun.*coawstM'); do "
+            f"  cwd=$(readlink /proc/$pid/cwd 2>/dev/null); "
+            f"  if [ \"$cwd\" = \"{cplexe}\" ]; then "
+            f"    echo \"Killing stale mpirun $pid\"; "
+            f"    kill -9 $pid 2>/dev/null; "
+            f"  fi; "
+            f"done"
+        )
+        if 'hqlx' in self.machine_name:
+            cmd = f'ssh {self.machine_name} "{kill_script}"'
+        else:
+            cmd = kill_script
+        utils.write_log(f'{print_prefix}Cleaning stale coawstM processes in {cplexe}')
+        subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        _time.sleep(2)
+
     def archive_data(self):
         io.check_mkdir(self.arch_root)
         # mv files
@@ -231,21 +265,10 @@ class Uranus:
             utils.write_log(print_prefix+'Archive: '+cmd)
             rcode=subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
         # cp files
-        file_patterns=['namelist.input']
+        file_patterns=['namelist.input','swan_bdy_d0*.dat','swan_hot_d0*.dat']
         for itm in file_patterns:
             tgt_fn=os.path.join(self.cplexe_root,itm)
             io.copy_files(tgt_fn, self.arch_root)
-            tgt_fn=os.path.join(self.arch_root,itm)
-            # Get the current file permissions
-            current_permissions = os.stat(tgt_fn).st_mode
-            # Add read permission for user group and others
-            new_permissions = current_permissions | 0o444
-            # Set the new permissions
-            os.chmod(tgt_fn, new_permissions) 
-                 #if self.active_comp[1]==1:
-        #    io.zip_roms_his(self.arch_root) 
-        #for itm in file_patterns:
-        #    io.move_files(os.path.join(self.cplexe_root,itm), self.arch_root)
     def _setup_logging(self):
         """
         Configures the logging module using the 
